@@ -16,6 +16,9 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
 
+app.setName('Miniclip')
+app.setAppUserModelId('com.miniclip.app')
+
 let win: BrowserWindow | null
 let prefsWin: BrowserWindow | null = null
 let tray: Tray | null = null
