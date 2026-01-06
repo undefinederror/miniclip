@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.3] - 2026-01-06
+
+### Changed
+- **Optimization**: Significant reduction in AppImage size by moving build-time dependencies to `devDependencies`.
+- **UI Refinement**: Increased contrast of footer keybinding hints for better readability.
+
 ## [1.0.2] - 2026-01-06
 
 ### Added

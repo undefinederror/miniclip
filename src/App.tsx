@@ -170,9 +170,9 @@ function App() {
         </ul>
 
         <div className="mt-4 text-[10px] text-gnome-text-dim flex justify-center flex-wrap gap-2 uppercase tracking-wider font-semibold opacity-70">
-          <span className="whitespace-nowrap"><span className="bg-gnome-border/30 px-1.5 py-0.5 rounded mx-1">Arrows</span> navigate</span>
-          <span className="whitespace-nowrap"><span className="bg-gnome-border/30 px-1.5 py-0.5 rounded mx-1">Enter</span> select</span>
-          <span className="whitespace-nowrap"><span className="bg-gnome-border/30 px-1.5 py-0.5 rounded ml-1">Canc</span> delete</span>
+          <span className="whitespace-nowrap"><span className="bg-gnome-border/70 px-1.5 py-0.5 rounded mx-1">Arrows</span> navigate</span>
+          <span className="whitespace-nowrap"><span className="bg-gnome-border/70 px-1.5 py-0.5 rounded mx-1">Enter</span> select</span>
+          <span className="whitespace-nowrap"><span className="bg-gnome-border/70 px-1.5 py-0.5 rounded ml-1">Canc</span> delete</span>
         </div>
       </div>
     </div>
