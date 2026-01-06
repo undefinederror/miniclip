@@ -196,6 +196,7 @@ function createPreferencesWindow() {
 
   prefsWin = new BrowserWindow({
     title: 'Preferences',
+    icon: nativeImage.createFromPath(path.join(process.env.VITE_PUBLIC, 'icon.png')),
     width: 350,
     height: 450,
     resizable: false,
@@ -220,8 +221,9 @@ function createPreferencesWindow() {
 }
 
 function createWindow() {
+  const iconPath = path.join(process.env.VITE_PUBLIC, 'icon.png')
   win = new BrowserWindow({
-    icon: path.join(process.env.VITE_PUBLIC, 'icon.png'),
+    icon: nativeImage.createFromPath(iconPath),
     frame: true, // Spotlight style
     width: 600,
     height: 400,
