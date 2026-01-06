@@ -1,6 +1,5 @@
+process.env.ELECTRON_DISABLE_SANDBOX = '1'
 import { app, BrowserWindow, ipcMain, clipboard, globalShortcut, Tray, Menu, nativeImage } from 'electron'
-
-app.commandLine.appendSwitch('no-sandbox')
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'

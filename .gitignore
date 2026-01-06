@@ -17,6 +17,7 @@ dist-electron/
 release/
 out/
 build/
+!build/*.cjs
 src-tauri/target/
 src-tauri/gen/
 

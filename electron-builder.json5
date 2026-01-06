@@ -33,14 +33,14 @@
   "nsis": {
     "oneClick": false,
     "perMachine": false,
-    "allowToChangeInstallationDirectory": true,
     "deleteAppDataOnUninstall": false
   },
+  "afterPack": "build/afterPack.cjs",
   "linux": {
     "target": [
       "AppImage"
     ],
-    "executableName": "Miniclip",
+    "executableName": "miniclip",
     "icon": "public/icon.png",
     "artifactName": "${productName}-Linux-${version}.${ext}"
   }
