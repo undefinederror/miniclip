@@ -4,6 +4,7 @@
   "appId": "com.miniclip.app",
   "asar": true,
   "productName": "Miniclip",
+  "icon": "public/icon.png",
   "directories": {
     "output": "release/${version}"
   },
@@ -38,6 +39,7 @@
     "target": [
       "AppImage"
     ],
+    "icon": "public/icon.png",
     "artifactName": "${productName}-Linux-${version}.${ext}"
   }
 }
