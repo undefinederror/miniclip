@@ -2,6 +2,9 @@ import { defineConfig } from 'vite'
 import path from 'node:path'
 import electron from 'vite-plugin-electron/simple'
 import react from '@vitejs/plugin-react'
+import pkg from './package.json'
+
+process.env.VITE_APP_VERSION = pkg.version
 
 // https://vitejs.dev/config/
 export default defineConfig({

@@ -67,3 +67,8 @@ body {
   background: #6b7280;
   /* gray-500 */
 }
+
+::placeholder {
+  color: var(--text-dim);
+  opacity: 0.7;
+}

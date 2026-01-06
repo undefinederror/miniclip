@@ -5,7 +5,6 @@ export default function Preferences() {
         launchOnStartup: true,
         maxHistorySize: 20,
         autoCloseOnSelect: true,
-        globalShortcut: 'CommandOrControl+Alt+G',
     });
 
     useEffect(() => {
@@ -21,7 +20,7 @@ export default function Preferences() {
     return (
         <div className="h-screen w-full bg-gnome-bg text-gnome-text p-4 font-sans select-none overflow-hidden flex flex-col">
             <header className="mb-6 flex items-center justify-center">
-                <h1 className="text-lg font-bold">Settings</h1>
+                <h1 className="text-lg font-bold">Preferences</h1>
             </header>
 
             <div className="flex-1 overflow-y-auto space-y-4">
@@ -56,25 +55,6 @@ export default function Preferences() {
                     </div>
                 </div>
 
-                {/* Shortcut Section */}
-                <div className="bg-gnome-surface border border-gnome-border/50 rounded-xl p-4 shadow-sm">
-                    <div className="flex flex-col space-y-3">
-                        <div className="flex flex-col">
-                            <span className="text-sm font-semibold">Global Shortcut</span>
-                            <span className="text-[11px] text-gnome-text-dim">Press combo to show Miniclip</span>
-                        </div>
-                        <input
-                            type="text"
-                            value={settings.globalShortcut}
-                            onChange={(e) => handleChange('globalShortcut', e.target.value)}
-                            placeholder="e.g. Ctrl+Alt+G"
-                            className="w-full bg-gnome-input border border-gnome-border rounded-lg p-2 text-xs text-gnome-text focus:outline-none focus:ring-2 focus:ring-gnome-accent/50 transition-all font-mono"
-                        />
-                        <p className="text-[8px] text-gnome-text-dim italic">
-                            Accelerators: CommandOrControl+Alt+G, Super+V, etc.
-                        </p>
-                    </div>
-                </div>
 
                 {/* History Section */}
                 <div className="bg-gnome-surface border border-gnome-border/50 rounded-xl p-4 shadow-sm">

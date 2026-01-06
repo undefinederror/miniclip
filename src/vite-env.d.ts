@@ -10,8 +10,9 @@ interface Window {
         hideWindow: () => Promise<void>
         minimizeWindow: () => Promise<void>
         closeWindow: () => Promise<void>
-        getSettings: () => Promise<{ launchOnStartup: boolean; maxHistorySize: number; autoCloseOnSelect: boolean; globalShortcut: string }>
-        setSettings: (settings: { launchOnStartup: boolean; maxHistorySize: number; autoCloseOnSelect: boolean; globalShortcut: string }) => Promise<void>
+        getSettings: () => Promise<{ launchOnStartup: boolean; maxHistorySize: number; autoCloseOnSelect: boolean }>
+        setSettings: (settings: { launchOnStartup: boolean; maxHistorySize: number; autoCloseOnSelect: boolean }) => Promise<void>
         onWindowHidden: (callback: () => void) => () => void
+        getVersion: () => Promise<string>
     }
 }

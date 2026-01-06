@@ -1,5 +1,5 @@
 process.env.ELECTRON_DISABLE_SANDBOX = '1'
-import { app, BrowserWindow, ipcMain, clipboard, globalShortcut, Tray, Menu, nativeImage } from 'electron'
+import { app, BrowserWindow, ipcMain, clipboard, Tray, Menu, nativeImage } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
@@ -23,20 +23,41 @@ let prefsWin: BrowserWindow | null = null
 let tray: Tray | null = null
 let db: any
 
+const gotTheLock = app.requestSingleInstanceLock()
+
+if (!gotTheLock) {
+  app.quit()
+} else {
+  app.on('second-instance', (_event, commandLine) => {
+    // If 'show' is in commandLine, show the window
+    if (commandLine.includes('show')) {
+      if (win) {
+        if (win.isMinimized()) win.restore()
+        win.show()
+        win.focus()
+      }
+    } else {
+      // Default behavior for second instance without arguments
+      if (win) {
+        if (win.isMinimized()) win.restore()
+        win.focus()
+      }
+    }
+  })
+}
+
 const SETTINGS_PATH = path.join(app.getPath('userData'), 'settings.json')
 
 interface Settings {
   launchOnStartup: boolean
   maxHistorySize: number
   autoCloseOnSelect: boolean
-  globalShortcut: string
 }
 
 const defaultSettings: Settings = {
   launchOnStartup: true,
   maxHistorySize: 20,
   autoCloseOnSelect: true,
-  globalShortcut: 'CommandOrControl+Alt+G'
 }
 
 function getSettings(): Settings {
@@ -57,10 +78,6 @@ function saveSettings(settings: Settings) {
     // Always trim DB on setting change
     if (db) {
       db.prepare('DELETE FROM clipboard_history WHERE id NOT IN (SELECT id FROM clipboard_history ORDER BY id DESC LIMIT ?)').run(settings.maxHistorySize)
-
-      // Update global shortcut if changed
-      globalShortcut.unregisterAll()
-      registerShortcut(settings.globalShortcut)
 
       // Notify windows to refresh
       win?.webContents.send('settings-changed')
@@ -116,21 +133,6 @@ function initDB() {
   `)
 }
 
-function registerShortcut(accelerator: string) {
-  try {
-    const success = globalShortcut.register(accelerator, () => {
-      if (win) {
-        win.show()
-        win.focus()
-      }
-    })
-    if (!success) {
-      console.error(`Failed to register shortcut: ${accelerator}`)
-    }
-  } catch (e) {
-    console.error(`Error registering shortcut: ${accelerator}`, e)
-  }
-}
 
 function createTray() {
   const icon = nativeImage.createFromPath(path.join(process.env.VITE_PUBLIC, 'icon.png'))
@@ -194,7 +196,7 @@ function createPreferencesWindow() {
   }
 
   prefsWin = new BrowserWindow({
-    title: 'Preferences',
+    title: `Preferences v${app.getVersion()}`,
     icon: nativeImage.createFromPath(path.join(process.env.VITE_PUBLIC, 'icon.png')),
     width: 350,
     height: 450,
@@ -219,13 +221,14 @@ function createPreferencesWindow() {
   })
 }
 
-function createWindow() {
+function createWindow(show: boolean = false) {
   const iconPath = path.join(process.env.VITE_PUBLIC, 'icon.png')
   win = new BrowserWindow({
+    title: `Miniclip v${app.getVersion()}`,
     icon: nativeImage.createFromPath(iconPath),
     frame: true, // Spotlight style
-    width: 600,
-    height: 400,
+    width: 350,
+    height: 450,
     backgroundColor: '#242424', // GNOME Dark BG
     show: false, // Start hidden to prevent white flash
     webPreferences: {
@@ -234,7 +237,9 @@ function createWindow() {
   })
 
   win.once('ready-to-show', () => {
-    win?.show()
+    if (show) {
+      win?.show()
+    }
   })
 
   // Prevent closing, just hide
@@ -270,7 +275,9 @@ app.on('window-all-closed', () => {
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow()
+    createWindow(true)
+  } else {
+    win?.show()
   }
 })
 
@@ -283,7 +290,7 @@ app.whenReady().then(() => {
   const settings = getSettings()
   updateAutostart(settings.launchOnStartup)
   createTray()
-  createWindow()
+  createWindow(false) // Start hidden on login/launch
 
   // --- IPC Handlers ---
   ipcMain.handle('close-window', () => {
@@ -323,8 +330,10 @@ app.whenReady().then(() => {
     win?.minimize()
   })
 
-  // --- Global Shortcut ---
-  registerShortcut(getSettings().globalShortcut)
+
+  ipcMain.handle('get-version', () => {
+    return app.getVersion()
+  })
 
   // --- Clipboard Monitoring ---
   let lastText = clipboard.readText()
@@ -351,6 +360,5 @@ app.whenReady().then(() => {
 })
 
 app.on('will-quit', () => {
-  globalShortcut.unregisterAll()
   db?.close()
 })

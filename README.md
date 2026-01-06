@@ -1,30 +1,50 @@
-# React + TypeScript + Vite
+# Miniclip
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+![Miniclip Preview](screenshot.png)
 
-Currently, two official plugins are available:
+A minimal, lightweight, modern clipboard manager for Linux (Wayland/X11), built with Electron and React.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Features
+- **Modern UI**: Clean, GNOME-inspired design with system theme support.
+- **In-Memory History**: Stores text-only clipboard entries during your current session.
+- **Start Hidden**: Launches hidden to the system tray to stay out of your way.
+- **Fast Search**: Instantly filter through your history as you type.
 
-## Expanding the ESLint configuration
+## Usage
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+Miniclip monitors your clipboard and stores a history of text entries.
+- **Arrows**: Move across items in the list.
+- **Enter**: Copy an item back to the clipboard.
+- **Delete**: Remove an item.
+- **Filter**: Find a specific item.
 
-- Configure the top-level `parserOptions` property like this:
-
-```js
-export default {
-  // other rules...
-  parserOptions: {
-    ecmaVersion: 'latest',
-    sourceType: 'module',
-    project: ['./tsconfig.json', './tsconfig.node.json'],
-    tsconfigRootDir: __dirname,
-  },
-}
+By default, Miniclip starts hidden in the system tray. To show the window, click the tray icon or run:
+```bash
+miniclip show
 ```
 
-- Replace `plugin:@typescript-eslint/recommended` to `plugin:@typescript-eslint/recommended-type-checked` or `plugin:@typescript-eslint/strict-type-checked`
-- Optionally add `plugin:@typescript-eslint/stylistic-type-checked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and add `plugin:react/recommended` & `plugin:react/jsx-runtime` to the `extends` list
+## Global Shortcut (Wayland & X11)
+
+Due to security limitations in modern display servers like **Wayland**, applications are often restricted from registering global keybindings while they don't have focus. 
+
+This is why it is recommend setting up a system-level shortcut. This ensures the best performance and compatibility with your desktop environment.
+
+### Setting up a shortcut in GNOME
+1. Open **Settings** -> **Keyboard** -> **View and Customize Shortcuts**.
+2. Go to **Custom Shortcuts** -> **Add Shortcut**.
+3. **Name**: `Miniclip Show`
+4. **Command**: `miniclip show`
+5. **Shortcut**: Your preferred combo (e.g., `Super+V` or `Ctrl+Alt+G`).
+
+## Installation
+
+**AppMan**: If you use [appman](https://github.com/phisch/appman), you can install it directly from the github release using:
+```bash
+appman -e undefinederror/miniclip miniclip
+```
+
+**AppImageLauncher**: For desktop integration, refer to  [AppImageLauncher docs](https://github.com/TheAssassin/AppImageLauncher).
+
+**Manual**: You can also download the AppImage from [releases](https://github.com/undefinederror/miniclip/releases) and run it directly. See the [official documentation](https://docs.appimage.org/introduction/quickstart.html#how-to-run-an-appimage) on how to handle AppImages manually.
+
+
