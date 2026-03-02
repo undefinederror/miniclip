@@ -103,6 +103,7 @@ function App() {
         const item = filteredItems[selectedIndex];
         if (item) {
           handleSelectItem(item.content);
+          handleDeleteItem(item.id);
         }
       } else if (e.key === "Delete") {
         e.preventDefault();
