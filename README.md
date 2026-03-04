@@ -7,12 +7,13 @@ A minimal, lightweight, modern clipboard manager for Linux (Wayland/X11), built 
 ## Features
 - **Modern UI**: Clean, GNOME-inspired design with system theme support.
 - **In-Memory History**: Stores text-only clipboard entries during your current session.
+- **Image support**: Stores both text and screenshots.
 - **Start Hidden**: Launches hidden to the system tray to stay out of your way.
-- **Fast Search**: Instantly filter through your history as you type.
+
 
 ## Usage
 
-Miniclip monitors your clipboard and stores a history of text entries.
+Miniclip monitors your clipboard and stores a history of entries.
 - **Arrows**: Move across items in the list.
 - **Enter**: Copy an item back to the clipboard.
 - **Delete**: Remove an item.

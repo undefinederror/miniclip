@@ -2,13 +2,6 @@ import { useEffect, useState, useRef } from "react";
 
 // Interface definitions moved to vite-env.d.ts
 
-export interface ClipboardItem {
-  id: number;
-  content: string;
-  timestamp: string; // ISO string
-}
-
-
 function App() {
   const [items, setItems] = useState<ClipboardItem[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(-1);
@@ -50,14 +43,26 @@ function App() {
     };
   }, []);
 
-  // Filter items
-  const filteredItems = items.filter((item) =>
-    item.content.toLowerCase().includes(search.toLowerCase())
-  );
+  // Filter items - only show text items when searching, but always show images
+  const filteredItems = items.filter((item) => {
+    if (item.content_type === 'image') {
+      return true; // Always show images regardless of search
+    }
+    return item.content.toLowerCase().includes(search.toLowerCase());
+  });
 
-  const handleSelectItem = async (content: string) => {
+  const handleSelectItem = async (item: ClipboardItem) => {
     try {
-      await window.electronAPI.copyToClipboard(content);
+      // Pass the item ID to the main process
+      // The main process will handle both text and image copying logic
+      await window.electronAPI.copyToClipboard(item.id);
+
+      // Delete the item from history after copying
+      // The clipboard monitor will detect the re-written content,
+      // re-insert it at the top, and fire onClipboardChange which
+      // triggers refreshItems() automatically.
+      await window.electronAPI.deleteHistoryItem(item.id);
+
       const settings = await window.electronAPI.getSettings();
       if (settings.autoCloseOnSelect) {
         await window.electronAPI.hideWindow();
@@ -102,7 +107,7 @@ function App() {
         e.preventDefault();
         const item = filteredItems[selectedIndex];
         if (item) {
-          handleSelectItem(item.content);
+          handleSelectItem(item);
           handleDeleteItem(item.id);
         }
       } else if (e.key === "Delete") {
@@ -130,6 +135,12 @@ function App() {
     }
   }, [selectedIndex]);
 
+  const formatSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   return (
     <div className="h-screen w-full bg-gnome-bg text-gnome-text flex flex-col overflow-hidden font-sans">
       <div className="p-3 flex flex-col flex-1 overflow-hidden">
@@ -151,15 +162,28 @@ function App() {
           {filteredItems.map((item, index) => (
             <li
               key={item.id}
-              className={`p-3 mr-2 rounded-lg cursor-pointer transition-all break-words border ${index === selectedIndex
+              className={`p-2 mr-2 rounded-lg cursor-pointer transition-all break-words border ${index === selectedIndex
                 ? "outline-2 -outline-offset-2 outline-orange-500 border-transparent shadow-md bg-gnome-surface"
                 : "bg-gnome-surface hover:bg-gnome-surface/80 text-gnome-text-dim border-gnome-border/50"
                 }`}
-              onClick={() => handleSelectItem(item.content)}
+              onClick={() => handleSelectItem(item)}
               onMouseEnter={() => setSelectedIndex(index)}
             >
-              <div className="text-sm font-medium line-clamp-4 break-all text-gnome-text whitespace-pre-wrap">
-                {item.content}
+              <div className="relative">
+                {item.content_type === 'image' ? (
+                  <img
+                    src={item.content}
+                    alt="Clipboard image"
+                    className="max-w-full h-auto rounded"
+                  />
+                ) : (
+                  <div className="text-sm font-medium line-clamp-4 break-all text-gnome-text whitespace-pre-wrap">
+                    {item.content}
+                  </div>
+                )}
+                <span className={`absolute ${item.content_type === 'image' ? 'bottom-1' : '-bottom-1'} -right-1 bg-black/60 text-white text-[10px] px-1 py-0.5 rounded flex align-center leading-none`}>
+                  {formatSize(item.content_size)}
+                </span>
               </div>
             </li>
           ))}

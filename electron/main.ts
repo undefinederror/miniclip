@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
 import Database from 'better-sqlite3'
+import crypto from 'crypto'
+import { Settings, defaultSettings } from '../src/shared/settings'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -21,7 +23,7 @@ app.setAppUserModelId('com.miniclip.app')
 let win: BrowserWindow | null
 let prefsWin: BrowserWindow | null = null
 let tray: Tray | null = null
-let db: any
+let db: Database.Database | null = null
 
 const gotTheLock = app.requestSingleInstanceLock()
 
@@ -48,16 +50,29 @@ if (!gotTheLock) {
 
 const SETTINGS_PATH = path.join(app.getPath('userData'), 'settings.json')
 
-interface Settings {
-  launchOnStartup: boolean
-  maxHistorySize: number
-  autoCloseOnSelect: boolean
-}
+function getDb(): Database.Database {
+  if (db) return db
 
-const defaultSettings: Settings = {
-  launchOnStartup: true,
-  maxHistorySize: 20,
-  autoCloseOnSelect: true,
+  db = new Database(':memory:')
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS clipboard_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      content TEXT NOT NULL,
+      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+      image_data BLOB,
+      content_type TEXT DEFAULT 'text',
+      original_format TEXT
+    )
+  `)
+
+  // Migration for existing data
+  try {
+    db.prepare('UPDATE clipboard_history SET content_type = ? WHERE content_type IS NULL').run('text')
+  } catch (e) {
+    console.log('Migration completed or not needed:', e)
+  }
+
+  return db
 }
 
 function getSettings(): Settings {
@@ -76,12 +91,10 @@ function saveSettings(settings: Settings) {
     fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2))
     updateAutostart(settings.launchOnStartup)
     // Always trim DB on setting change
-    if (db) {
-      db.prepare('DELETE FROM clipboard_history WHERE id NOT IN (SELECT id FROM clipboard_history ORDER BY id DESC LIMIT ?)').run(settings.maxHistorySize)
+    getDb().prepare('DELETE FROM clipboard_history WHERE id NOT IN (SELECT id FROM clipboard_history ORDER BY id DESC LIMIT ?)').run(settings.maxHistorySize)
 
-      // Notify windows to refresh
-      win?.webContents.send('settings-changed')
-    }
+    // Notify windows to refresh
+    win?.webContents.send('settings-changed')
   } catch (e) {
     console.error('Failed to save settings:', e)
   }
@@ -122,16 +135,9 @@ StartupNotify=false
   }
 }
 
-function initDB() {
-  db = new Database(':memory:')
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS clipboard_history (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      content TEXT NOT NULL,
-      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `)
-}
+
+
+
 
 
 function createTray() {
@@ -199,7 +205,7 @@ function createPreferencesWindow() {
     title: `Preferences v${app.getVersion()}`,
     icon: nativeImage.createFromPath(path.join(process.env.VITE_PUBLIC, 'icon.png')),
     width: 350,
-    height: 450,
+    height: 550,
     resizable: false,
     frame: true,
     backgroundColor: '#242424', // GNOME Dark BG
@@ -228,7 +234,7 @@ function createWindow(show: boolean = false) {
     icon: nativeImage.createFromPath(iconPath),
     frame: true, // Spotlight style
     width: 350,
-    height: 450,
+    height: 550,
     backgroundColor: '#242424', // GNOME Dark BG
     show: false, // Start hidden to prevent white flash
     webPreferences: {
@@ -282,11 +288,10 @@ app.on('activate', () => {
 })
 
 app.on('before-quit', () => {
-  ; (app as any).isQuitting = true
+  (app as any).isQuitting = true
 })
 
 app.whenReady().then(() => {
-  initDB()
   const settings = getSettings()
   updateAutostart(settings.launchOnStartup)
   createTray()
@@ -309,16 +314,72 @@ app.whenReady().then(() => {
 
   ipcMain.handle('get-history', () => {
     const settings = getSettings()
-    const stmt = db.prepare('SELECT * FROM clipboard_history ORDER BY id DESC LIMIT ?')
-    return stmt.all(settings.maxHistorySize)
+    const stmt = getDb().prepare('SELECT * FROM clipboard_history ORDER BY id DESC LIMIT ?')
+    const rows = stmt.all(settings.maxHistorySize) as ClipboardItem[]
+    return rows.map(row => ({
+      ...row,
+      image_data: row.image_data ? Buffer.from(row.image_data) : undefined,
+      content_size: row.content_type === 'image'
+        ? (row.image_data ? row.image_data.length : 0)
+        : Buffer.byteLength(row.content, 'utf-8'),
+    }))
   })
 
-  ipcMain.handle('copy-to-clipboard', (_event, text) => {
-    clipboard.writeText(text)
+  ipcMain.handle('copy-to-clipboard', (_event, itemId: number) => {
+    // Retrieve the item from database using the ID
+    try {
+      const stmt = getDb().prepare('SELECT * FROM clipboard_history WHERE id = ?')
+      const row = stmt.get(itemId) as ClipboardItem | undefined
+
+      if (!row) {
+        console.error('Item not found in database')
+        return
+      }
+
+      if (row.content_type === 'image') {
+        // Handle image copying using raw image data
+        console.log('Copying image from database, ID:', itemId)
+
+        // Reset lastImageHash so the clipboard monitor will detect the
+        // re-written image as new content and re-insert it at the top of history.
+        // Without this, the hash would match and the monitor would skip re-inserting,
+        // causing the item to disappear after being deleted from the old position.
+        lastImageHash = ''
+
+        if (row.image_data) {
+          const imageFromData = nativeImage.createFromBuffer(Buffer.from(row.image_data))
+          if (!imageFromData.isEmpty()) {
+            clipboard.writeImage(imageFromData)
+            console.log('Successfully copied image from raw data')
+            return
+          } else {
+            console.error('Failed to create image from raw data buffer')
+          }
+        } else {
+          console.error('No image data found in database')
+        }
+
+        // Fallback to data URL if raw data fails
+        console.log('Falling back to data URL method')
+        const image = nativeImage.createFromDataURL(row.content)
+        if (!image.isEmpty()) {
+          clipboard.writeImage(image)
+          console.log('Successfully copied image from data URL')
+        } else {
+          console.error('Failed to create image from data URL')
+        }
+      } else {
+        // Handle text copying
+        clipboard.writeText(row.content)
+        console.log('Successfully copied text from database')
+      }
+    } catch (e) {
+      console.error('Database error when retrieving item:', e)
+    }
   })
 
   ipcMain.handle('delete-history-item', (_event, id: number) => {
-    db.prepare('DELETE FROM clipboard_history WHERE id = ?').run(id)
+    getDb().prepare('DELETE FROM clipboard_history WHERE id = ?').run(id)
   })
 
   ipcMain.handle('hide-window', () => {
@@ -337,26 +398,79 @@ app.whenReady().then(() => {
 
   // --- Clipboard Monitoring ---
   let lastText = clipboard.readText()
+  let lastImageHash = ''
+
   setInterval(() => {
+    const clipboardFormats = clipboard.availableFormats()
+    const hasImage = clipboardFormats.some(format => format.startsWith('image/'))
     const text = clipboard.readText()
-    if (text && text !== lastText) {
+
+    if (hasImage) {
+      const image = clipboard.readImage()
+      if (!image.isEmpty()) {
+        // Create a hash to detect changes
+        const imageData = image.toPNG()
+        const imageHash = crypto.createHash('md5').update(imageData).digest('hex')
+
+        if (imageHash !== lastImageHash) {
+          lastImageHash = imageHash
+          lastText = '' // Reset text since we have an image
+          const settings = getSettings()
+
+          try {
+            // Detect original format
+            const originalFormat = clipboardFormats.find(format => format.startsWith('image/'))
+
+            let imageData: Buffer
+            if (originalFormat === 'image/jpeg' || originalFormat === 'image/jpg') {
+              imageData = image.toJPEG(90)
+            } else {
+              imageData = image.toPNG()
+            }
+
+            // Check image size limit
+            const imageSizeKB = imageData.length / 1024
+            if (settings.maxImageSize > 0 && imageSizeKB > settings.maxImageSize) {
+              console.log(`Image too large (${imageSizeKB.toFixed(2)}KB > ${settings.maxImageSize}KB), skipping`)
+              return
+            }
+
+            // Save image to DB - store the data URL for display and raw data for copying
+            const stmt = getDb().prepare('INSERT INTO clipboard_history (content, image_data, content_type, original_format) VALUES (?, ?, ?, ?)')
+            stmt.run(image.toDataURL(), imageData, 'image', originalFormat)
+
+            // Always trim DB by default
+            getDb().prepare('DELETE FROM clipboard_history WHERE id NOT IN (SELECT id FROM clipboard_history ORDER BY id DESC LIMIT ?)').run(settings.maxHistorySize)
+
+            // Notify Renderer
+            win?.webContents.send('clipboard-change', image.toDataURL())
+            console.log('Image saved to clipboard history')
+          } catch (e) {
+            console.error('DB Image Insert Error:', e)
+          }
+        }
+      }
+    }
+    // Handle text content (only if no image)
+    else if (text && text !== lastText) {
       lastText = text
       const settings = getSettings()
-      // Save to DB
+      // Save text to DB
       try {
-        const stmt = db.prepare('INSERT INTO clipboard_history (content) VALUES (?)')
-        stmt.run(text)
+        const stmt = getDb().prepare('INSERT INTO clipboard_history (content, content_type) VALUES (?, ?)')
+        stmt.run(text, 'text')
 
         // Always trim DB by default
-        db.prepare('DELETE FROM clipboard_history WHERE id NOT IN (SELECT id FROM clipboard_history ORDER BY id DESC LIMIT ?)').run(settings.maxHistorySize)
+        getDb().prepare('DELETE FROM clipboard_history WHERE id NOT IN (SELECT id FROM clipboard_history ORDER BY id DESC LIMIT ?)').run(settings.maxHistorySize)
 
         // Notify Renderer
         win?.webContents.send('clipboard-change', text)
+        console.log('Text saved to clipboard history')
       } catch (e) {
         console.error('DB Insert Error:', e)
       }
     }
-  }, 1000)
+  }, 500) // Reduced from 1000ms to 500ms for faster detection
 })
 
 app.on('will-quit', () => {
