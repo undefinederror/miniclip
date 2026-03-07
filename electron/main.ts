@@ -1,5 +1,5 @@
 process.env.ELECTRON_DISABLE_SANDBOX = '1'
-import { app, BrowserWindow, ipcMain, clipboard, Tray, Menu, nativeImage } from 'electron'
+import { app, BrowserWindow, ipcMain, clipboard, Tray, Menu, nativeImage, shell } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
@@ -436,6 +436,10 @@ app.whenReady().then(() => {
 
   ipcMain.handle('get-version', () => {
     return app.getVersion()
+  })
+
+  ipcMain.handle('open-external', (_event, url: string) => {
+    shell.openExternal(url)
   })
 
   // --- Clipboard Monitoring ---

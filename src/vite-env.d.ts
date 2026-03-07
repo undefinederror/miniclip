@@ -27,6 +27,7 @@ declare global {
             setSettings: (settings: Settings) => Promise<void>
             onWindowHidden: (callback: () => void) => () => void
             getVersion: () => Promise<string>
+            openExternal: (url: string) => Promise<void>
         }
     }
 }

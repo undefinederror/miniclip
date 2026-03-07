@@ -14,20 +14,18 @@ export default function About() {
       <div className="space-y-4">
         <div className="flex flex-col">
           <span className="text-sm font-semibold">Author</span>
-          <a
-            href="https://github.com/undefinederror/miniclip"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 group"
+          <div
+            onClick={() => window.electronAPI.openExternal('https://github.com/undefinederror/miniclip')}
+            className="flex items-center gap-2 group cursor-pointer"
           >
             <span className="text-[13px] text-gnome-text-dim group-hover:text-gnome-accent">
               undefinederror (l.paci)
             </span>
             <div className="relative w-12 h-4">
               
-              <img className="block absolute bottom-1/2 translate-y-1/2 left-0 h-5 w-auto" src="https://github.githubassets.com/favicons/favicon-dark.svg" height="32" width="32" />
+              <img className="block absolute bottom-1/2 translate-y-1/2 left-0 h-5 w-auto" src="github.svg" height="32" width="32" />
             </div>
-          </a>
+          </div>
         </div>
 
         <div className="flex flex-col">
