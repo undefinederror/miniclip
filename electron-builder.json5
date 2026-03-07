@@ -1,47 +1,50 @@
-// @see - https://www.electron.build/configuration/configuration
 {
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
   "appId": "com.miniclip.app",
   "asar": true,
   "productName": "Miniclip",
   "executableName": "Miniclip",
-  "icon": "public/icon.png",
-  "directories": {
+    "directories": {
     "output": "release/${version}"
   },
   "files": [
     "dist",
     "dist-electron"
   ],
-  "mac": {
-    "target": [
-      "dmg"
+  "afterPack": "./build/afterPack.cjs",
+  "snap": {
+    "artifactName": "miniclip-${version}-x86_64.snap",
+    "category": "Utility",
+    "summary": "A simple clipboard manager for Linux with history tracking",
+    "description": "Miniclip is a simple clipboard manager for Linux. Keep track of your clipboard history and quickly access previously copied items.\n\nFeatures:\n- Clipboard history tracking\n- Text and image support\n- System tray integration\n- Quick access via global shortcut",
+        "confinement": "strict",
+    "grade": "stable",
+    "plugs": [
+      "home",
+      "desktop",
+      "wayland",
+      "x11",
+      "browser-support"
     ],
-    "artifactName": "${productName}-Mac-${version}-Installer.${ext}"
+    "stagePackages": [
+      "libnspr4",
+      "libnss3",
+      "libxss1",
+      "libappindicator3-1",
+      "libsecret-1-0"
+    ]
   },
-  "win": {
-    "target": [
-      {
-        "target": "nsis",
-        "arch": [
-          "x64"
-        ]
-      }
-    ],
-    "artifactName": "${productName}-Windows-${version}-Setup.${ext}"
-  },
-  "nsis": {
-    "oneClick": false,
-    "perMachine": false,
-    "deleteAppDataOnUninstall": false
-  },
-  "afterPack": "build/afterPack.cjs",
   "linux": {
     "target": [
-      "AppImage"
+      "appimage",
+      "deb",
+      "snap"
     ],
+    "category": "Utility",
     "executableName": "miniclip",
     "icon": "public/icon.png",
-    "artifactName": "${productName}-Linux-${version}.${ext}"
+    "synopsis": "A simple clipboard manager for Linux with history tracking",
+    "description": "Miniclip is a simple clipboard manager for Linux. Keep track of your clipboard history and quickly access previously copied items.\n\nFeatures:\n- Clipboard history tracking\n- Text and image support\n- System tray integration\n- Quick access via global shortcut",
+    "artifactName": "miniclip-${version}-x86_64.${ext}"
   }
 }

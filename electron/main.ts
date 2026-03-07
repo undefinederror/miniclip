@@ -22,6 +22,7 @@ app.setAppUserModelId('com.miniclip.app')
 
 let win: BrowserWindow | null
 let prefsWin: BrowserWindow | null = null
+let aboutWin: BrowserWindow | null = null
 let tray: Tray | null = null
 let db: Database.Database | null = null
 
@@ -135,11 +136,6 @@ StartupNotify=false
   }
 }
 
-
-
-
-
-
 function createTray() {
   const icon = nativeImage.createFromPath(path.join(process.env.VITE_PUBLIC, 'icon.png'))
   tray = new Tray(icon)
@@ -174,6 +170,13 @@ function createTray() {
         createPreferencesWindow()
       },
     },
+    {
+      label: 'About',
+      icon: loadIcon('tray_info.png'),
+      click: () => {
+        createAboutWindow()
+      },
+    },
     { type: 'separator' },
     {
       label: 'Quit',
@@ -202,7 +205,7 @@ function createPreferencesWindow() {
   }
 
   prefsWin = new BrowserWindow({
-    title: `Preferences v${app.getVersion()}`,
+    title: `Preferences`,
     icon: nativeImage.createFromPath(path.join(process.env.VITE_PUBLIC, 'icon.png')),
     width: 350,
     height: 550,
@@ -227,10 +230,49 @@ function createPreferencesWindow() {
   })
 }
 
+function createAboutWindow() {
+  if (aboutWin) {
+    aboutWin.focus()
+    return
+  }
+
+  aboutWin = new BrowserWindow({
+    title: `About`,
+    icon: nativeImage.createFromPath(path.join(process.env.VITE_PUBLIC, 'icon.png')),
+    width: 350,
+    height: 400,
+    resizable: false,
+    frame: true,
+    backgroundColor: '#242424', // GNOME Dark BG
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.mjs'),
+    },
+  })
+
+  aboutWin.setMenu(null)
+
+  aboutWin.webContents.on('before-input-event', (_event, input) => {
+    if (input.key === 'F12' && input.type === 'keyDown') {
+      aboutWin?.webContents.toggleDevTools()
+    }
+  })
+
+
+  if (VITE_DEV_SERVER_URL) {
+    aboutWin.loadURL(`${VITE_DEV_SERVER_URL}#about`)
+  } else {
+    aboutWin.loadFile(path.join(RENDERER_DIST, 'index.html'), { hash: 'about' })
+  }
+
+  aboutWin.on('closed', () => {
+    aboutWin = null
+  })
+}
+
 function createWindow(show: boolean = false) {
   const iconPath = path.join(process.env.VITE_PUBLIC, 'icon.png')
   win = new BrowserWindow({
-    title: `Miniclip v${app.getVersion()}`,
+    title: `Miniclip`,
     icon: nativeImage.createFromPath(iconPath),
     frame: true, // Spotlight style
     width: 350,

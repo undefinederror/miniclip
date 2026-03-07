@@ -1,8 +1,8 @@
 # Miniclip
 
-![Miniclip Preview](screenshot.png)
+![Miniclip Preview](screenshot.jpg)
 
-A minimal, lightweight, modern clipboard manager for Linux (Wayland/X11), built with Electron and React.
+A minimal, simple, modern clipboard manager for Linux (Wayland/X11), built with Electron and React.
 
 ## Features
 - **Modern UI**: Clean, GNOME-inspired design with system theme support.

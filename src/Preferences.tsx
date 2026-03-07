@@ -16,10 +16,6 @@ export default function Preferences() {
 
     return (
         <div className="h-screen w-full bg-gnome-bg text-gnome-text p-3 font-sans select-none overflow-hidden flex flex-col">
-            <header className="mb-6 flex items-center justify-center">
-                <h1 className="text-lg font-bold">Preferences</h1>
-            </header>
-
             <div className="flex-1 overflow-y-auto space-y-2">
                 {/* General Section */}
                 <div className="bg-gnome-surface border border-gnome-border/50 rounded-xl overflow-hidden shadow-sm">

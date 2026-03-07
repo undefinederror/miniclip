@@ -1,0 +1,70 @@
+name: miniclip
+title: Miniclip
+version: '1.1.0'
+summary: A simple clipboard manager for Linux
+description: |
+  Miniclip is a simple clipboard manager for Linux. Keep track of your 
+  clipboard history and quickly access previously copied items.
+  
+  Features:
+  - Clipboard history tracking
+  - Text and image support
+  - System tray integration
+  - Quick access via global shortcut
+
+grade: stable
+confinement: classic
+base: core22
+
+architectures:
+  - build-on: amd64
+
+parts:
+  miniclip:
+    plugin: nil
+    source: .
+    build-snaps:
+      - nodejs/20/stable
+      - electron/30/stable
+    override-build: |
+      npm install
+      npm run build
+      mkdir -p $SNAPCRAFT_PART_INSTALL/bin
+      mkdir -p $SNAPCRAFT_PART_INSTALL/share/miniclip
+      cp -r dist/* $SNAPCRAFT_PART_INSTALL/share/miniclip/
+      cp -r dist-electron/* $SNAPCRAFT_PART_INSTALL/share/miniclip/
+      cp -r public/* $SNAPCRAFT_PART_INSTALL/share/miniclip/
+      echo '#!/bin/bash' > $SNAPCRAFT_PART_INSTALL/bin/miniclip
+      echo 'export ELECTRON_IS_DEV=0' >> $SNAPCRAFT_PART_INSTALL/bin/miniclip
+      echo 'export ELECTRON_NO_ASAR=1' >> $SNAPCRAFT_PART_INSTALL/bin/miniclip
+      echo 'cd "$SNAP/share/miniclip" && electron .' >> $SNAPCRAFT_PART_INSTALL/bin/miniclip
+      chmod +x $SNAPCRAFT_PART_INSTALL/bin/miniclip
+      mkdir -p $SNAPCRAFT_PART_INSTALL/usr/share/applications
+      cp miniclip.desktop $SNAPCRAFT_PART_INSTALL/usr/share/applications/
+    stage-packages:
+      - libnss3
+      - libnspr4
+      - libatk1.0-0
+      - libatk-bridge2.0-0
+      - libcups2
+      - libdrm2
+      - libxkbcommon0
+      - libxcomposite1
+      - libxdamage1
+      - libxfixes3
+      - libxrandr2
+      - libgbm1
+      - libpango-1.0-0
+      - libcairo2
+      - libasound2
+
+apps:
+  miniclip:
+    command: bin/miniclip
+    desktop: usr/share/applications/miniclip.desktop
+    category: Utility
+    icon: share/miniclip/icon.png
+    summary: Clipboard manager with history tracking
+    plugs:
+      - home
+      - clipboard-manager

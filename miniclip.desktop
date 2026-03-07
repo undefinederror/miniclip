@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Miniclip
+Comment=A simple clipboard manager for Linux
+Exec=miniclip
+Icon=/share/miniclip/icon.png
+Terminal=false
+Type=Application
+Categories=Utility;Utility;
+Keywords=clipboard;copy;paste;history;
+StartupNotify=false
