@@ -25,7 +25,7 @@ export default function About() {
             </span>
             <div className="relative w-12 h-4">
               
-              <img className="block absolute bottom-1/2 translate-y-1/2 left-0 h-5 w-auto" src="https://github.githubassets.com/favicons/favicon-dark.svg" height="32" width="32" />
+              <img className="block absolute bottom-1/2 translate-y-1/2 left-0 h-5 w-auto" src="github.svg" height="32" width="32" />
             </div>
           </a>
         </div>

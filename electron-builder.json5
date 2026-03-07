@@ -11,34 +11,10 @@
     "dist",
     "dist-electron"
   ],
-  "afterPack": "./build/afterPack.cjs",
-  "snap": {
-    "artifactName": "miniclip-${version}-x86_64.snap",
-    "category": "Utility",
-    "summary": "A simple clipboard manager for Linux with history tracking",
-    "description": "Miniclip is a simple clipboard manager for Linux. Keep track of your clipboard history and quickly access previously copied items.\n\nFeatures:\n- Clipboard history tracking\n- Text and image support\n- System tray integration\n- Quick access via global shortcut",
-        "confinement": "strict",
-    "grade": "stable",
-    "plugs": [
-      "home",
-      "desktop",
-      "wayland",
-      "x11",
-      "browser-support"
-    ],
-    "stagePackages": [
-      "libnspr4",
-      "libnss3",
-      "libxss1",
-      "libappindicator3-1",
-      "libsecret-1-0"
-    ]
-  },
   "linux": {
     "target": [
       "appimage",
       "deb",
-      "snap"
     ],
     "category": "Utility",
     "executableName": "miniclip",

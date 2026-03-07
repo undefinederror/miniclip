@@ -8,7 +8,6 @@ A minimal, simple, modern clipboard manager for Linux (Wayland/X11), built with 
 - **Modern UI**: Clean, GNOME-inspired design with system theme support.
 - **In-Memory History**: Stores text-only clipboard entries during your current session.
 - **Image support**: Stores both text and screenshots.
-- **Start Hidden**: Launches hidden to the system tray to stay out of your way.
 
 
 ## Usage
@@ -36,16 +35,5 @@ This is why it is recommend setting up a system-level shortcut. This ensures the
 3. **Name**: `Miniclip Show`
 4. **Command**: `miniclip show`
 5. **Shortcut**: Your preferred combo (e.g., `Super+V` or `Ctrl+Alt+G`).
-
-## Installation
-
-**AppMan**: If you use [appman](https://github.com/phisch/appman), you can install it directly from the github release using:
-```bash
-appman -e undefinederror/miniclip miniclip
-```
-
-**AppImageLauncher**: For desktop integration, refer to  [AppImageLauncher docs](https://github.com/TheAssassin/AppImageLauncher).
-
-**Manual**: You can also download the AppImage from [releases](https://github.com/undefinederror/miniclip/releases) and run it directly. See the [official documentation](https://docs.appimage.org/introduction/quickstart.html#how-to-run-an-appimage) on how to handle AppImages manually.
 
 
