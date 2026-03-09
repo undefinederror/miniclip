@@ -1,6 +1,6 @@
 name: miniclip
 title: Miniclip
-version: '1.1.0'
+version: '1.1.2'
 icon: icon.png
 summary: A simple clipboard manager for Linux
 description: |
@@ -66,7 +66,16 @@ parts:
       npm install
       npm run build
       mkdir -p $SNAPCRAFT_PART_INSTALL/share/miniclip
-      cp -r release/1.1.0/linux-unpacked/* $SNAPCRAFT_PART_INSTALL/
+      
+      # Find the latest release directory and copy its contents
+      LATEST_RELEASE=$(ls -dt release/*/ | head -n1)
+      if [ -d "$LATEST_RELEASE/linux-unpacked" ]; then
+        cp -r "$LATEST_RELEASE/linux-unpacked"/* $SNAPCRAFT_PART_INSTALL/
+      else
+        echo "Error: linux-unpacked directory not found in $LATEST_RELEASE"
+        exit 1
+      fi
+      
       # Remove chrome-sandbox as it's unnecessary in simple Electron apps
       rm -f $SNAPCRAFT_PART_INSTALL/chrome-sandbox
       mkdir -p $SNAPCRAFT_PART_INSTALL/usr/share/applications
