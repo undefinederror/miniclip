@@ -34,6 +34,10 @@
     },
     "artifactName": "miniclip-${version}-x86_64.${ext}"
   },
+  "publish": {
+    "provider": "github",
+    "vPrefixedTagName": false
+  },
   "snap": {
     "confinement": "strict",
     "grade": "stable",
