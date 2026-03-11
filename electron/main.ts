@@ -17,8 +17,11 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
 
-app.setName('Miniclip')
-app.setAppUserModelId('com.miniclip.app')
+const APP_ID = VITE_DEV_SERVER_URL ? 'miniclip-dev' : 'com.miniclip.app'
+const APP_NAME = VITE_DEV_SERVER_URL ? 'Miniclip Dev' : 'Miniclip'
+
+app.setName(APP_NAME)
+app.setAppUserModelId(APP_ID)
 
 let win: BrowserWindow | null
 let prefsWin: BrowserWindow | null = null
@@ -104,18 +107,19 @@ function saveSettings(settings: Settings) {
 function updateAutostart(enable: boolean) {
   if (process.platform !== 'linux') return
   const autostartDir = path.join(app.getPath('home'), '.config', 'autostart')
-  const desktopFilePath = path.join(autostartDir, 'miniclip.desktop')
+  const desktopFilePath = path.join(autostartDir, `${APP_ID}.desktop`)
 
   if (enable) {
     const desktopFileContent = `[Desktop Entry]
 Type=Application
 Version=1.0
-Name=Miniclip
+Name=${APP_NAME}
 Comment=Clipboard Manager
 Exec=${process.env.APPIMAGE || app.getPath('exe')}
 Icon=${path.join(process.env.VITE_PUBLIC, 'icon.png')}
 Terminal=false
 StartupNotify=false
+StartupWMClass=${APP_ID}
 `
     try {
       if (!fs.existsSync(autostartDir)) {
@@ -271,9 +275,15 @@ function createAboutWindow() {
 
 function createWindow(show: boolean = false) {
   const iconPath = path.join(process.env.VITE_PUBLIC, 'icon.png')
+  const icon = nativeImage.createFromPath(iconPath)
+
+  if (icon.isEmpty()) {
+    console.error(`[CRITICAL] Icon file is EMPTY or NOT FOUND at: ${iconPath}`)
+  }
+
   win = new BrowserWindow({
     title: `Miniclip`,
-    icon: nativeImage.createFromPath(iconPath),
+    icon: icon,
     frame: true, // Spotlight style
     width: 350,
     height: 550,

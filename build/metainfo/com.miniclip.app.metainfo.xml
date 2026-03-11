@@ -24,7 +24,7 @@
     </ul>
   </description>
 
-  <launchable type="desktop-id">miniclip.desktop</launchable>
+  <launchable type="desktop-id">com.miniclip.app.desktop</launchable>
 
   <url type="homepage">https://github.com/undefinederror/miniclip</url>
   <url type="bugtracker">https://github.com/undefinederror/miniclip/issues</url>
