@@ -34,24 +34,40 @@
     },
     "artifactName": "miniclip-${version}-x86_64.${ext}"
   },
+  "publish": {
+    "provider": "github",
+    "vPrefixedTagName": false,
+    "releaseType": "release"
+  },
   "snap": {
     "confinement": "strict",
     "grade": "stable",
+    "base": "core22",
     "plugs": [
       "home",
       "desktop",
       "desktop-legacy",
       "x11",
       "wayland",
-      "shared-memory",
-      "system-observe"
+      "browser-support",
+      "system-observe",
+      {
+        "shmem": {
+          "interface": "shared-memory",
+          "private": true
+        }
+      }
     ],
+    "environment": {
+      "TMPDIR": "$XDG_RUNTIME_DIR",
+      "DISABLE_WAYLAND": "1",
+      "ELECTRON_DISABLE_SANDBOX": "1"
+    },
     "publish": {
       "provider": "snapStore",
-      "channels": ["stable"]
-    },
-    "environment": {
-      "TMPDIR": "$XDG_RUNTIME_DIR"
+      "channels": [
+        "stable"
+      ]
     }
   }
 }
