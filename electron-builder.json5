@@ -4,12 +4,18 @@
   "asar": true,
   "productName": "Miniclip",
   "executableName": "Miniclip",
-    "directories": {
+  "directories": {
     "output": "release/${version}"
   },
   "files": [
     "dist",
     "dist-electron"
+  ],
+  "extraResources": [
+    {
+      "from": "build/metainfo/com.miniclip.app.metainfo.xml",
+      "to": "../usr/share/metainfo/com.miniclip.app.metainfo.xml"
+    }
   ],
   "linux": {
     "target": [
