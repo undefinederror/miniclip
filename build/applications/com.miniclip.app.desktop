@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Miniclip
+Exec=AppRun --no-sandbox %U
+Terminal=false
+Type=Application
+Icon=miniclip
+StartupWMClass=miniclip
+X-AppImage-Version=1.1.4
+Keywords=clipboard;copy;paste;history;
+Comment=Miniclip is a simple clipboard manager for Linux. Keep track of your clipboard history and quickly access previously copied items.
+Categories=Utility;

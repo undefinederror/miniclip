@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Automatically keeps build/metainfo/com.miniclip.app.metainfo.xml in sync
+// Automatically keeps build/metainfo/com.miniclip.app.appdata.xml in sync
 // with the version in package.json. Run as part of the build step.
 
 import { readFileSync, writeFileSync } from 'fs'
@@ -13,7 +13,7 @@ const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
 const version = pkg.version
 const date = new Date().toISOString().split('T')[0] // YYYY-MM-DD
 
-const metainfoPath = resolve(root, 'build/metainfo/com.miniclip.app.metainfo.xml')
+const metainfoPath = resolve(root, 'build/metainfo/com.miniclip.app.appdata.xml')
 let xml = readFileSync(metainfoPath, 'utf8')
 
 // Check if this version already exists — skip if so (idempotent)

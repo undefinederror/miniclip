@@ -13,14 +13,18 @@
   ],
   "extraResources": [
     {
-      "from": "build/metainfo/com.miniclip.app.metainfo.xml",
-      "to": "../usr/share/metainfo/com.miniclip.app.metainfo.xml"
-    }
+      "from": "build/metainfo/com.miniclip.app.appdata.xml",
+      "to": "../usr/share/metainfo/com.miniclip.app.appdata.xml"
+    },
+    {
+      "from": "build/applications/com.miniclip.app.desktop",
+      "to": "../usr/share/applications/com.miniclip.app.desktop"
+    },
   ],
   "linux": {
     "target": [
       "appimage",
-      "deb",
+      // "deb",
       "snap"
     ],
     "category": "Utility",
@@ -38,10 +42,21 @@
     "vPrefixedTagName": false,
     "releaseType": "release"
   },
+  // afterAllArtifactBuild:"./scripts/fix-appimage.mjs",
+  // afterExtract:"./scripts/fix-appimage.mjs",
+  // afterPack:"./scripts/fix-appimage.mjs",
+  // afterSign:"./scripts/fix-appimage.mjs",
+  // appxManifestCreated:"./scripts/fix-appimage.mjs",
+  // artifactBuildCompleted:"./scripts/fix-appimage.mjs",
+  // artifactBuildStarted:"./scripts/fix-appimage.mjs",
+  // beforeBuild:"./scripts/fix-appimage.mjs",
+  beforePack:"./scripts/fix-appimage.mjs",
   "snap": {
     "confinement": "strict",
     "grade": "stable",
     "base": "core22",
+    "summary": "A simple clipboard manager for Linux with history tracking",
+    "description": "Miniclip is a simple clipboard manager for Linux. It monitors your clipboard and stores a history of entries (text and images) so you can quickly access previously copied items.\n\nKey features:\n- Clipboard history tracking\n- Text and image support\n- System tray integration\n- Quick access via global shortcut",
     "plugs": [
       "home",
       "desktop",
@@ -58,13 +73,16 @@
       }
     ],
     "environment": {
-      "TMPDIR": "$XDG_RUNTIME_DIR",
+      "TMPDIR": "$XDG_RUNTIME_DIR"
     },
-    "publish": {
-      "provider": "snapStore",
-      "channels": [
-        "stable"
-      ]
-    }
+    "publish": [
+      {
+        "provider": "snapStore",
+        "channels": "stable"
+      },
+      {
+        "provider": "github"
+      }
+    ]
   }
 }
