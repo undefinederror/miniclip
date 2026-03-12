@@ -17,10 +17,11 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
 
-const APP_ID = VITE_DEV_SERVER_URL ? 'miniclip-dev' : 'com.miniclip.app'
-const APP_NAME = VITE_DEV_SERVER_URL ? 'Miniclip Dev' : 'Miniclip'
+const APP_ID = 'com.miniclip.app'
+const APP_NAME = 'Miniclip'
+const APP_CLASS = 'miniclip'
 
-app.setName(APP_NAME)
+app.setName(APP_CLASS)
 app.setAppUserModelId(APP_ID)
 
 let win: BrowserWindow | null
@@ -43,7 +44,6 @@ if (!gotTheLock) {
         win.focus()
       }
     } else {
-      // Default behavior for second instance without arguments
       if (win) {
         if (win.isMinimized()) win.restore()
         win.focus()
@@ -119,7 +119,7 @@ Exec=${process.env.APPIMAGE || app.getPath('exe')}
 Icon=${path.join(process.env.VITE_PUBLIC, 'icon.png')}
 Terminal=false
 StartupNotify=false
-StartupWMClass=${APP_ID}
+StartupWMClass=${APP_CLASS}
 `
     try {
       if (!fs.existsSync(autostartDir)) {

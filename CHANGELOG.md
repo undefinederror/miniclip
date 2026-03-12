@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.4] - 2026-03-12
+
+### Fixed
+- **Linux Dock Integration**: Resolved issues with the Linux dock. Standardized `StartupWMClass` across all build formats.
+- **Snap Stability**: Fixed "Permission Denied" crashes in Snap builds by adding essential plugs
+- **Release Identity**: Unified application identity and versioning
+
+### Added
+- **Automated Release Pipeline**: Integrated GitHub Actions to automatically build and publish AppImage, .deb, and Snap packages.
+- **Better-SQLite3 Prebuilds**: Integrated native dependency rebuilding in CI,
+
+## [1.1.3] - 2026-03-11
+
+### Added
+- **GitHub Actions**: Automated the release process via CI.
+- **AppStream Metadata**: Added metainfo file for better integration with software centers (Flathub/GNOME Software).
+
+## [1.1.2] - 2026-03-06
+
+### Fixed
+- **Snap Build**: Resolved build-time errors when generating snap packages.
+
+## [1.1.1] - 2026-03-05
+
+### Fixed
+- **About Link**: Ensured the project link in the About window opens in the system's default browser instead of a new Electron window.
+
 ## [1.1.0] - 2026-03-04
 
 ### Added

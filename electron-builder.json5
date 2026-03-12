@@ -3,7 +3,7 @@
   "appId": "com.miniclip.app",
   "asar": true,
   "productName": "Miniclip",
-  "executableName": "Miniclip",
+  "executableName": "miniclip",
   "directories": {
     "output": "release/${version}"
   },
@@ -24,13 +24,12 @@
       "snap"
     ],
     "category": "Utility",
-    "executableName": "miniclip",
     "icon": "public/icon.png",
     "synopsis": "A simple clipboard manager for Linux with history tracking",
-    "description": "Miniclip is a simple clipboard manager for Linux. Keep track of your clipboard history and quickly access previously copied items.\n\nFeatures:\n- Clipboard history tracking\n- Text and image support\n- System tray integration\n- Quick access via global shortcut",
+    "description": "Miniclip is a simple clipboard manager for Linux. Keep track of your clipboard history and quickly access previously copied items.",
     "desktop": {
       "Keywords": "clipboard;copy;paste;history;",
-      "StartupWMClass": "com.miniclip.app"
+      "StartupWMClass": "miniclip"
     },
     "artifactName": "miniclip-${version}-x86_64.${ext}"
   },
@@ -60,8 +59,6 @@
     ],
     "environment": {
       "TMPDIR": "$XDG_RUNTIME_DIR",
-      "DISABLE_WAYLAND": "1",
-      "ELECTRON_DISABLE_SANDBOX": "1"
     },
     "publish": {
       "provider": "snapStore",
