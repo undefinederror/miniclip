@@ -1,4 +1,5 @@
 export interface Settings {
+    firstLaunch: boolean
     launchOnStartup: boolean
     maxHistorySize: number
     autoCloseOnSelect: boolean
@@ -7,6 +8,7 @@ export interface Settings {
 }
 
 export const defaultSettings: Settings = {
+    firstLaunch: true,
     launchOnStartup: true,
     maxHistorySize: 20,
     autoCloseOnSelect: true,

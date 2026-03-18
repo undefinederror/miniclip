@@ -24,7 +24,7 @@
   "linux": {
     "target": [
       "appimage",
-      // "deb",
+      "deb",
       "snap"
     ],
     "category": "Utility",
@@ -42,14 +42,6 @@
     "vPrefixedTagName": false,
     "releaseType": "release"
   },
-  // afterAllArtifactBuild:"./scripts/fix-appimage.mjs",
-  // afterExtract:"./scripts/fix-appimage.mjs",
-  // afterPack:"./scripts/fix-appimage.mjs",
-  // afterSign:"./scripts/fix-appimage.mjs",
-  // appxManifestCreated:"./scripts/fix-appimage.mjs",
-  // artifactBuildCompleted:"./scripts/fix-appimage.mjs",
-  // artifactBuildStarted:"./scripts/fix-appimage.mjs",
-  // beforeBuild:"./scripts/fix-appimage.mjs",
   beforePack:"./scripts/fix-appimage.mjs",
   "snap": {
     "confinement": "strict",

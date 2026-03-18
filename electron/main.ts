@@ -273,17 +273,10 @@ function createAboutWindow() {
   })
 }
 
-function createWindow(show: boolean = false) {
-  const iconPath = path.join(process.env.VITE_PUBLIC, 'icon.png')
-  const icon = nativeImage.createFromPath(iconPath)
-
-  if (icon.isEmpty()) {
-    console.error(`[CRITICAL] Icon file is EMPTY or NOT FOUND at: ${iconPath}`)
-  }
-
+function createMainWindow(show: boolean = false) {
   win = new BrowserWindow({
     title: `Miniclip`,
-    icon: icon,
+    icon: nativeImage.createFromPath(path.join(process.env.VITE_PUBLIC, 'icon.png')),
     frame: true, // Spotlight style
     width: 350,
     height: 550,
@@ -311,11 +304,13 @@ function createWindow(show: boolean = false) {
   })
 
   // Enable F12 to open DevTools
-  win.webContents.on('before-input-event', (_event, input) => {
-    if (input.key === 'F12' && input.type === 'keyDown') {
-      win?.webContents.toggleDevTools()
-    }
-  })
+  if (VITE_DEV_SERVER_URL) {
+    win.webContents.on('before-input-event', (_event, input) => {
+      if (input.key === 'F12' && input.type === 'keyDown') {
+        win?.webContents.toggleDevTools()
+      }
+    })
+  }
 
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
@@ -333,10 +328,13 @@ app.on('window-all-closed', () => {
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow(true)
+    createMainWindow(getSettings().firstLaunch)
+    saveSettings({ ...getSettings(), firstLaunch: false })
+    win?.show()
   } else {
     win?.show()
   }
+  win?.focus()
 })
 
 app.on('before-quit', () => {
@@ -347,7 +345,10 @@ app.whenReady().then(() => {
   const settings = getSettings()
   updateAutostart(settings.launchOnStartup)
   createTray()
-  createWindow(false) // Start hidden on login/launch
+  createMainWindow(getSettings().firstLaunch)
+  saveSettings({ ...getSettings(), firstLaunch: false })
+  win?.focus()
+  // Start hidden on login/launch
 
   // --- IPC Handlers ---
   ipcMain.handle('close-window', () => {
