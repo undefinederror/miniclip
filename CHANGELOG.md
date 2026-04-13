@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.6] - 2026-04-13
+
+### Fixed
+- **Snap Autostart**: Fixed .desktop file path for snap.
+
+## [1.1.5] - 2026-04-13
+
+### Fixed
+- **AppImage Tests**: Force-show the main window on first launch to satisfy AppImage integration tests.
+
 ## [1.1.4] - 2026-03-12
 
 ### Fixed

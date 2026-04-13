@@ -31,7 +31,7 @@ Miniclip monitors your clipboard and stores a history of entries.
 - **Delete**: Remove an item.
 - **Filter**: Find a specific item.
 
-By default, Miniclip starts hidden in the system tray. To show the window, click the tray icon or run:
+When Miniclip is hidden in the system tray it can be shown by clicking the tray icon or runing:
 ```bash
 miniclip show
 ```

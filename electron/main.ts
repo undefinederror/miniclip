@@ -106,16 +106,27 @@ function saveSettings(settings: Settings) {
 
 function updateAutostart(enable: boolean) {
   if (process.platform !== 'linux') return
-  const autostartDir = path.join(app.getPath('home'), '.config', 'autostart')
+  // In a snap, $HOME is redirected to the snap's private data dir.
+  // SNAP_REAL_HOME always points to the user's actual home directory.
+  const realHome = process.env.SNAP_REAL_HOME || app.getPath('home')
+  const autostartDir = path.join(realHome, '.config', 'autostart')
   const desktopFilePath = path.join(autostartDir, `${APP_ID}.desktop`)
 
   if (enable) {
+    // Determine the correct executable path:
+    //   - Snap: use the snapd shim at /snap/bin/<name> (preserves confinement setup)
+    //   - AppImage: APPIMAGE env var holds the path to the .AppImage file
+    //   - Fallback: the raw Electron executable
+    const snapName = process.env.SNAP_NAME
+    const execPath = snapName
+      ? `/snap/bin/${snapName}`
+      : (process.env.APPIMAGE || app.getPath('exe'))
     const desktopFileContent = `[Desktop Entry]
 Type=Application
 Version=1.0
 Name=${APP_NAME}
 Comment=Clipboard Manager
-Exec=${process.env.APPIMAGE || app.getPath('exe')}
+Exec=${execPath}
 Icon=${path.join(process.env.VITE_PUBLIC, 'icon.png')}
 Terminal=false
 StartupNotify=false
