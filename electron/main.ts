@@ -113,30 +113,76 @@ function updateAutostart(enable: boolean) {
   const desktopFilePath = path.join(autostartDir, `${APP_ID}.desktop`)
 
   if (enable) {
-    // Determine the correct executable path:
-    //   - Snap: use the snapd shim at /snap/bin/<name> (preserves confinement setup)
+    // Determine the correct executable path per packaging format:
+    //   - Snap:     use the snapd shim at /snap/bin/<name> (preserves confinement)
     //   - AppImage: APPIMAGE env var holds the path to the .AppImage file
-    //   - Fallback: the raw Electron executable
+    //   - Deb/pkg:  the installed binary is on $PATH as the executableName
+    //   - Dev mode: fall back to the raw Electron executable
     const snapName = process.env.SNAP_NAME
-    const execPath = snapName
-      ? `/snap/bin/${snapName}`
-      : (process.env.APPIMAGE || app.getPath('exe'))
-    const desktopFileContent = `[Desktop Entry]
-Type=Application
-Version=1.0
-Name=${APP_NAME}
-Comment=Clipboard Manager
-Exec=${execPath}
-Icon=${path.join(process.env.VITE_PUBLIC, 'icon.png')}
-Terminal=false
-StartupNotify=false
-StartupWMClass=${APP_CLASS}
-`
+    let execPath: string
+    if (snapName) {
+      execPath = `/snap/bin/${snapName}`
+    } else if (process.env.APPIMAGE) {
+      execPath = process.env.APPIMAGE
+    } else {
+      // For deb/rpm installs, electron-builder places the binary at
+      // /usr/bin/<executableName>. Use that if it exists, otherwise
+      // fall back to the raw exe path (covers dev mode and portable builds).
+      const installedBin = `/usr/bin/${APP_CLASS}`
+      execPath = fs.existsSync(installedBin) ? installedBin : app.getPath('exe')
+    }
+
+    // Icon path varies by packaging format:
+    //   - Snap:     icon lives at $SNAP/meta/gui/icon.png inside the bundle
+    //   - AppImage: dist/ is inside the asar, unreadable by the session manager;
+    //               extract it to ~/.local/share/icons/ so it's findable by name
+    //   - Deb:      registered in the system icon theme by app ID
+    //   - Dev:      absolute path from the public/ directory (not in asar)
+    let iconPath: string
+    if (snapName) {
+      iconPath = path.join(process.env.SNAP as string, 'meta', 'gui', 'icon.png')
+    } else if (process.env.APPIMAGE) {
+      // Extract the icon from the asar so the session manager can find it
+      const userIconDir = path.join(realHome, '.local', 'share', 'icons', 'hicolor', '256x256', 'apps')
+      const userIconPath = path.join(userIconDir, `${APP_CLASS}.png`)
+      try {
+        if (!fs.existsSync(userIconPath)) {
+          fs.mkdirSync(userIconDir, { recursive: true })
+          // Electron's fs transparently reads from asar archives
+          const iconBuffer = fs.readFileSync(path.join(process.env.VITE_PUBLIC as string, 'icon.png'))
+          fs.writeFileSync(userIconPath, iconBuffer)
+        }
+      } catch (e) {
+        console.error('Failed to install AppImage icon:', e)
+      }
+      iconPath = APP_CLASS // now discoverable via the hicolor icon theme
+    } else if (process.env.VITE_DEV_SERVER_URL) {
+      iconPath = path.join(process.env.VITE_PUBLIC as string, 'icon.png')
+    } else {
+      iconPath = APP_ID // deb: installed into system icon theme by the package
+    }
+
+    const desktopFileContent = [
+      '[Desktop Entry]',
+      'Type=Application',
+      'Version=1.0',
+      `Name=${APP_NAME}`,
+      'Comment=Clipboard Manager',
+      `Exec=${execPath}`,
+      `Icon=${iconPath}`,
+      'Terminal=false',
+      'StartupNotify=false',
+      `StartupWMClass=${APP_CLASS}`,
+      'Hidden=false',
+      'X-GNOME-Autostart-enabled=true',
+    ].join('\n') + '\n'
+
     try {
       if (!fs.existsSync(autostartDir)) {
         fs.mkdirSync(autostartDir, { recursive: true })
       }
       fs.writeFileSync(desktopFilePath, desktopFileContent)
+      console.log(`Autostart enabled: wrote ${desktopFilePath}`)
     } catch (e) {
       console.error('Failed to create autostart file:', e)
     }
@@ -144,6 +190,7 @@ StartupWMClass=${APP_CLASS}
     try {
       if (fs.existsSync(desktopFilePath)) {
         fs.unlinkSync(desktopFilePath)
+        console.log(`Autostart disabled: removed ${desktopFilePath}`)
       }
     } catch (e) {
       console.error('Failed to remove autostart file:', e)
