@@ -106,11 +106,13 @@ function saveSettings(settings: Settings) {
 
 function updateAutostart(enable: boolean) {
   if (process.platform !== 'linux') return
-  // In a snap, $HOME is redirected to the snap's private data dir.
-  // SNAP_REAL_HOME always points to the user's actual home directory.
-  const realHome = process.env.SNAP_REAL_HOME || app.getPath('home')
-  const autostartDir = path.join(realHome, '.config', 'autostart')
-  const desktopFilePath = path.join(autostartDir, `${APP_ID}.desktop`)
+  // In a snap, app.getPath('home') correctly resolves to $SNAP_USER_DATA.
+  // snapd monitors $SNAP_USER_DATA/.config/autostart/ and automatically manages the real autostart entry.
+  const autostartDir = path.join(app.getPath('home'), '.config', 'autostart')
+  
+  // Snap autostart requires the filename to match the app name in snapcraft.yaml (miniclip.desktop)
+  const desktopFileName = process.env.SNAP_NAME ? `${APP_CLASS}.desktop` : `${APP_ID}.desktop`
+  const desktopFilePath = path.join(autostartDir, desktopFileName)
 
   if (enable) {
     // Determine the correct executable path per packaging format:
@@ -143,7 +145,9 @@ function updateAutostart(enable: boolean) {
       iconPath = path.join(process.env.SNAP as string, 'meta', 'gui', 'icon.png')
     } else if (process.env.APPIMAGE) {
       // Extract the icon from the asar so the session manager can find it
-      const userIconDir = path.join(realHome, '.local', 'share', 'icons', 'hicolor', '256x256', 'apps')
+      // Use the actual user home for AppImage desktop integration
+      const userHome = process.env.HOME || app.getPath('home')
+      const userIconDir = path.join(userHome, '.local', 'share', 'icons', 'hicolor', '256x256', 'apps')
       const userIconPath = path.join(userIconDir, `${APP_CLASS}.png`)
       try {
         if (!fs.existsSync(userIconPath)) {
