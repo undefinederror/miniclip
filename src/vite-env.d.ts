@@ -28,6 +28,7 @@ declare global {
             onWindowHidden: (callback: () => void) => () => void
             getVersion: () => Promise<string>
             openExternal: (url: string) => Promise<void>
+            isSnap: boolean
         }
     }
 }

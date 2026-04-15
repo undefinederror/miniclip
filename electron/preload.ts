@@ -2,6 +2,7 @@ import { ipcRenderer, contextBridge } from 'electron'
 
 // --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld('electronAPI', {
+  isSnap: !!process.env.SNAP_NAME,
   onClipboardChange: (callback: (text: string) => void) => {
     const subscription = (_event: any, text: string) => callback(text)
     ipcRenderer.on('clipboard-change', subscription)
