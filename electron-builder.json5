@@ -44,6 +44,7 @@
   },
   beforePack:"./scripts/fix-appimage.mjs",
   "snap": {
+    "autoStart": true,
     "confinement": "strict",
     "grade": "stable",
     "base": "core22",
@@ -51,7 +52,6 @@
     "description": "Miniclip is a simple clipboard manager for Linux. It monitors your clipboard and stores a history of entries (text and images) so you can quickly access previously copied items.\n\nKey features:\n- Clipboard history tracking\n- Text and image support\n- System tray integration\n- Quick access via global shortcut",
     "plugs": [
       "home",
-      "autostart",
       "desktop",
       "desktop-legacy",
       "x11",

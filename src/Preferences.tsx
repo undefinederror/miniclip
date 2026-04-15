@@ -20,18 +20,20 @@ export default function Preferences() {
                 {/* General Section */}
                 <div className="bg-gnome-surface border border-gnome-border/50 rounded-xl overflow-hidden shadow-sm">
                     {/* Launch on Startup */}
-                    <div className="flex items-center justify-between p-2 border-b border-gnome-border/30 hover:bg-gnome-text/5 transition-colors">
-                        <div className="flex flex-col">
-                            <span className="text-sm font-semibold">Launch on startup</span>
-                            <span className="text-[11px] text-gnome-text-dim">Start automatically at login</span>
+                    {!window.electronAPI.isSnap && (
+                        <div className="flex items-center justify-between p-2 border-b border-gnome-border/30 hover:bg-gnome-text/5 transition-colors">
+                            <div className="flex flex-col">
+                                <span className="text-sm font-semibold">Launch on startup</span>
+                                <span className="text-[11px] text-gnome-text-dim">Start automatically at login</span>
+                            </div>
+                            <input
+                                type="checkbox"
+                                checked={settings.launchOnStartup}
+                                onChange={(e) => handleChange('launchOnStartup', e.target.checked)}
+                                className="w-5 h-5 accent-gnome-accent rounded cursor-pointer"
+                            />
                         </div>
-                        <input
-                            type="checkbox"
-                            checked={settings.launchOnStartup}
-                            onChange={(e) => handleChange('launchOnStartup', e.target.checked)}
-                            className="w-5 h-5 accent-gnome-accent rounded cursor-pointer"
-                        />
-                    </div>
+                    )}
 
                     {/* Autoclose on select */}
                     <div className="flex items-center justify-between p-2 hover:bg-gnome-text/5 transition-colors">

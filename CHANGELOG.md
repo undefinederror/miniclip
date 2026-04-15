@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.7] - 2026-04-16
+
+### Fixed
+- **Autostart option**: Removed option from snap since it can't be optional.
+
 ## [1.1.6] - 2026-04-13
 
 ### Fixed

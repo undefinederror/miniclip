@@ -28,8 +28,17 @@ declare global {
             onWindowHidden: (callback: () => void) => () => void
             getVersion: () => Promise<string>
             openExternal: (url: string) => Promise<void>
+            isSnap: boolean
         }
     }
+}
+
+interface ImportMetaEnv {
+  readonly VITE_APP_VERSION: string
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv
 }
 
 export { }

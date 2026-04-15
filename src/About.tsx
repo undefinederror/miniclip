@@ -8,7 +8,7 @@ export default function About() {
           className="w-20 h-20 rounded-2xl mb-4"
         />
         <h1 className="text-2xl font-bold">Miniclip</h1>
-        <p className="text-sm text-gnome-text-dim">Version 1.1.0</p>
+        <p className="text-sm text-gnome-text-dim">Version {import.meta.env.VITE_APP_VERSION}</p>
       </header>
 
       <div className="space-y-4">
