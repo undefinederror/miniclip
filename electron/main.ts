@@ -6,6 +6,21 @@ import fs from 'node:fs'
 import Database from 'better-sqlite3'
 import crypto from 'crypto'
 import { Settings, defaultSettings } from '../src/shared/settings'
+import log from 'electron-log/main'
+
+// --- Logging setup ---
+log.initialize()
+log.transports.file.level = 'debug'
+log.transports.console.level = 'debug'
+log.transports.file.maxSize = 5 * 1024 * 1024 // 5 MB
+
+// Catch unhandled errors BEFORE anything else so crashes are always logged
+process.on('uncaughtException', (error) => {
+  log.error('[uncaughtException]', error)
+})
+process.on('unhandledRejection', (reason) => {
+  log.error('[unhandledRejection]', reason)
+})
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -73,7 +88,7 @@ function getDb(): Database.Database {
   try {
     db.prepare('UPDATE clipboard_history SET content_type = ? WHERE content_type IS NULL').run('text')
   } catch (e) {
-    console.log('Migration completed or not needed:', e)
+    log.info('Migration completed or not needed:', e)
   }
 
   return db
@@ -85,7 +100,7 @@ function getSettings(): Settings {
       return { ...defaultSettings, ...JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8')) }
     }
   } catch (e) {
-    console.error('Failed to read settings:', e)
+    log.error('Failed to read settings:', e)
   }
   return defaultSettings
 }
@@ -100,7 +115,7 @@ function saveSettings(settings: Settings) {
     // Notify windows to refresh
     win?.webContents.send('settings-changed')
   } catch (e) {
-    console.error('Failed to save settings:', e)
+    log.error('Failed to save settings:', e)
   }
 }
 
@@ -157,7 +172,7 @@ function updateAutostart(enable: boolean) {
           fs.writeFileSync(userIconPath, iconBuffer)
         }
       } catch (e) {
-        console.error('Failed to install AppImage icon:', e)
+        log.error('Failed to install AppImage icon:', e)
       }
       iconPath = APP_CLASS // now discoverable via the hicolor icon theme
     } else if (process.env.VITE_DEV_SERVER_URL) {
@@ -186,18 +201,18 @@ function updateAutostart(enable: boolean) {
         fs.mkdirSync(autostartDir, { recursive: true })
       }
       fs.writeFileSync(desktopFilePath, desktopFileContent)
-      console.log(`Autostart enabled: wrote ${desktopFilePath}`)
+      log.info(`Autostart enabled: wrote ${desktopFilePath}`)
     } catch (e) {
-      console.error('Failed to create autostart file:', e)
+      log.error('Failed to create autostart file:', e)
     }
   } else {
     try {
       if (fs.existsSync(desktopFilePath)) {
         fs.unlinkSync(desktopFilePath)
-        console.log(`Autostart disabled: removed ${desktopFilePath}`)
+        log.info(`Autostart disabled: removed ${desktopFilePath}`)
       }
     } catch (e) {
-      console.error('Failed to remove autostart file:', e)
+      log.error('Failed to remove autostart file:', e)
     }
   }
 }
@@ -211,7 +226,7 @@ function createTray() {
     const p = path.join(process.env.VITE_PUBLIC, name)
     const img = nativeImage.createFromPath(p)
     if (img.isEmpty()) {
-      console.error(`Tray icon ${name} is empty! Checked path: ${p}`)
+      log.error(`Tray icon ${name} is empty! Checked path: ${p}`)
     }
     return img
   }
@@ -404,6 +419,9 @@ app.on('before-quit', () => {
 })
 
 app.whenReady().then(() => {
+  log.info(`=== Miniclip starting up === v${app.getVersion()}`)
+  log.info(`Log file: ${log.transports.file.getFile().path}`)
+
   const settings = getSettings()
   updateAutostart(settings.launchOnStartup)
   createTray()
@@ -447,13 +465,13 @@ app.whenReady().then(() => {
       const row = stmt.get(itemId) as ClipboardItem | undefined
 
       if (!row) {
-        console.error('Item not found in database')
+        log.error('Item not found in database')
         return
       }
 
       if (row.content_type === 'image') {
         // Handle image copying using raw image data
-        console.log('Copying image from database, ID:', itemId)
+        log.info('Copying image from database, ID:', itemId)
 
         // Reset lastImageHash so the clipboard monitor will detect the
         // re-written image as new content and re-insert it at the top of history.
@@ -465,31 +483,31 @@ app.whenReady().then(() => {
           const imageFromData = nativeImage.createFromBuffer(Buffer.from(row.image_data))
           if (!imageFromData.isEmpty()) {
             clipboard.writeImage(imageFromData)
-            console.log('Successfully copied image from raw data')
+            log.info('Successfully copied image from raw data')
             return
           } else {
-            console.error('Failed to create image from raw data buffer')
+            log.error('Failed to create image from raw data buffer')
           }
         } else {
-          console.error('No image data found in database')
+          log.error('No image data found in database')
         }
 
         // Fallback to data URL if raw data fails
-        console.log('Falling back to data URL method')
+        log.warn('Falling back to data URL method')
         const image = nativeImage.createFromDataURL(row.content)
         if (!image.isEmpty()) {
           clipboard.writeImage(image)
-          console.log('Successfully copied image from data URL')
+          log.info('Successfully copied image from data URL')
         } else {
-          console.error('Failed to create image from data URL')
+          log.error('Failed to create image from data URL')
         }
       } else {
         // Handle text copying
         clipboard.writeText(row.content)
-        console.log('Successfully copied text from database')
+        log.info('Successfully copied text from database')
       }
     } catch (e) {
-      console.error('Database error when retrieving item:', e)
+      log.error('Database error when retrieving item:', e)
     }
   })
 
@@ -550,7 +568,7 @@ app.whenReady().then(() => {
             // Check image size limit
             const imageSizeKB = imageData.length / 1024
             if (settings.maxImageSize > 0 && imageSizeKB > settings.maxImageSize) {
-              console.log(`Image too large (${imageSizeKB.toFixed(2)}KB > ${settings.maxImageSize}KB), skipping`)
+              log.info(`Image too large (${imageSizeKB.toFixed(2)}KB > ${settings.maxImageSize}KB), skipping`)
               return
             }
 
@@ -563,9 +581,9 @@ app.whenReady().then(() => {
 
             // Notify Renderer
             win?.webContents.send('clipboard-change', image.toDataURL())
-            console.log('Image saved to clipboard history')
+            log.info('Image saved to clipboard history')
           } catch (e) {
-            console.error('DB Image Insert Error:', e)
+            log.error('DB Image Insert Error:', e)
           }
         }
       }
@@ -584,9 +602,9 @@ app.whenReady().then(() => {
 
         // Notify Renderer
         win?.webContents.send('clipboard-change', text)
-        console.log('Text saved to clipboard history')
+        log.info('Text saved to clipboard history')
       } catch (e) {
-        console.error('DB Insert Error:', e)
+        log.error('DB Insert Error:', e)
       }
     }
   }, 500) // Reduced from 1000ms to 500ms for faster detection

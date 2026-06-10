@@ -1,6 +1,6 @@
 {
   "name": "miniclip",
-  "version": "1.1.7",
+  "version": "1.2.0",
   "description": "A simple clipboard manager for Linux",
   "author": "undefinederror <github@object.ninja>",
   "license": "GPL-3.0-only",
@@ -15,7 +15,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "better-sqlite3": "^12.5.0"
+    "better-sqlite3": "^12.5.0",
+    "electron-log": "^5.4.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",

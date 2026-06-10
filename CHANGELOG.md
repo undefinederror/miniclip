@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-06-10
+
+### Added
+- **Electron log**: Persistent log file in ~/.config/miniclip/logs/main.log.
+
 ## [1.1.7] - 2026-04-16
 
 ### Fixed
