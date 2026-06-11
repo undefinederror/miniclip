@@ -1,5 +1,5 @@
 process.env.ELECTRON_DISABLE_SANDBOX = '1'
-import { app, BrowserWindow, ipcMain, clipboard, Tray, Menu, nativeImage, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, clipboard, Tray, Menu, nativeImage, shell, protocol } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
@@ -45,6 +45,10 @@ let aboutWin: BrowserWindow | null = null
 let tray: Tray | null = null
 let db: Database.Database | null = null
 
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'miniclip-img', privileges: { secure: true, standard: true, supportFetchAPI: true, bypassCSP: true } }
+])
+
 const gotTheLock = app.requestSingleInstanceLock()
 
 if (!gotTheLock) {
@@ -72,7 +76,11 @@ const SETTINGS_PATH = path.join(app.getPath('userData'), 'settings.json')
 function getDb(): Database.Database {
   if (db) return db
 
-  db = new Database(':memory:')
+  // Use a file-based DB in userData so image blobs are paged to disk
+  // instead of accumulating in RAM (was :memory: — caused OOM kills)
+  const dbPath = path.join(app.getPath('userData'), 'clipboard_history.db')
+  log.info(`Opening DB at: ${dbPath}`)
+  db = new Database(dbPath)
   db.exec(`
     CREATE TABLE IF NOT EXISTS clipboard_history (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -91,6 +99,12 @@ function getDb(): Database.Database {
     log.info('Migration completed or not needed:', e)
   }
 
+  try {
+    db.exec('ALTER TABLE clipboard_history ADD COLUMN hash TEXT')
+  } catch (e) {
+    // Ignore if column already exists
+  }
+
   return db
 }
 
@@ -105,12 +119,31 @@ function getSettings(): Settings {
   return defaultSettings
 }
 
+function trimHistory(maxSize: number) {
+  try {
+    const db = getDb()
+    const rowsToDelete = db.prepare(`SELECT id, content, content_type FROM clipboard_history WHERE id NOT IN (SELECT id FROM clipboard_history ORDER BY id DESC LIMIT ?)`).all(maxSize) as any[]
+    for (const row of rowsToDelete) {
+      if (row.content_type === 'image' && row.content.startsWith('miniclip-img://')) {
+        try {
+          const filename = new URL(row.content).hostname
+          const filepath = path.join(app.getPath('userData'), 'images', filename)
+          if (fs.existsSync(filepath)) fs.unlinkSync(filepath)
+        } catch (e) { log.error('Failed to delete trimmed image file', e) }
+      }
+      db.prepare('DELETE FROM clipboard_history WHERE id = ?').run(row.id)
+    }
+  } catch (e) {
+    log.error('Failed to trim history', e)
+  }
+}
+
 function saveSettings(settings: Settings) {
   try {
     fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2))
     updateAutostart(settings.launchOnStartup)
     // Always trim DB on setting change
-    getDb().prepare('DELETE FROM clipboard_history WHERE id NOT IN (SELECT id FROM clipboard_history ORDER BY id DESC LIMIT ?)').run(settings.maxHistorySize)
+    trimHistory(settings.maxHistorySize)
 
     // Notify windows to refresh
     win?.webContents.send('settings-changed')
@@ -421,6 +454,30 @@ app.on('before-quit', () => {
 app.whenReady().then(() => {
   log.info(`=== Miniclip starting up === v${app.getVersion()}`)
   log.info(`Log file: ${log.transports.file.getFile().path}`)
+  const mem = process.memoryUsage()
+  log.info(`Memory on startup: RSS=${(mem.rss/1024/1024).toFixed(1)}MB heap=${(mem.heapUsed/1024/1024).toFixed(1)}/${(mem.heapTotal/1024/1024).toFixed(1)}MB`)
+
+  const IMAGES_DIR = path.join(app.getPath('userData'), 'images')
+  if (!fs.existsSync(IMAGES_DIR)) fs.mkdirSync(IMAGES_DIR, { recursive: true })
+
+  protocol.registerFileProtocol('miniclip-img', (request, callback) => {
+    try {
+      const url = new URL(request.url)
+      const filename = url.hostname
+      callback({ path: path.join(IMAGES_DIR, filename) })
+    } catch (e) {
+      log.error('Protocol handling error:', e)
+      callback({ error: -2 }) // net::ERR_FAILED
+    }
+  })
+
+  // Log native sub-process crashes (renderer, GPU, utility)
+  app.on('render-process-gone', (_event, _webContents, details) => {
+    log.error('[render-process-gone]', details.reason, 'exitCode:', details.exitCode)
+  })
+  app.on('child-process-gone', (_event, details) => {
+    log.error('[child-process-gone]', details.type, details.reason, 'exitCode:', details.exitCode)
+  })
 
   const settings = getSettings()
   updateAutostart(settings.launchOnStartup)
@@ -451,9 +508,9 @@ app.whenReady().then(() => {
     const rows = stmt.all(settings.maxHistorySize) as ClipboardItem[]
     return rows.map(row => ({
       ...row,
-      image_data: row.image_data ? Buffer.from(row.image_data) : undefined,
+      image_data: undefined, // no longer sending raw buffer to renderer
       content_size: row.content_type === 'image'
-        ? (row.image_data ? row.image_data.length : 0)
+        ? 0 // or we could stat the file, but 0 is fine for display
         : Buffer.byteLength(row.content, 'utf-8'),
     }))
   })
@@ -479,11 +536,25 @@ app.whenReady().then(() => {
         // causing the item to disappear after being deleted from the old position.
         lastImageHash = ''
 
-        if (row.image_data) {
+        if (row.content.startsWith('miniclip-img://')) {
+          try {
+            const filename = new URL(row.content).hostname
+            const filepath = path.join(app.getPath('userData'), 'images', filename)
+            const imageFromFile = nativeImage.createFromPath(filepath)
+            if (!imageFromFile.isEmpty()) {
+              clipboard.writeImage(imageFromFile)
+              log.info('Successfully copied image from file')
+              return
+            } else {
+              log.error('Failed to create image from file path')
+            }
+          } catch(e) { log.error('Error copying image from file:', e) }
+        } else if (row.image_data) {
+          // Fallback to legacy database blob
           const imageFromData = nativeImage.createFromBuffer(Buffer.from(row.image_data))
           if (!imageFromData.isEmpty()) {
             clipboard.writeImage(imageFromData)
-            log.info('Successfully copied image from raw data')
+            log.info('Successfully copied image from legacy raw data')
             return
           } else {
             log.error('Failed to create image from raw data buffer')
@@ -512,6 +583,17 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('delete-history-item', (_event, id: number) => {
+    try {
+      const stmt = getDb().prepare('SELECT content, content_type FROM clipboard_history WHERE id = ?')
+      const row = stmt.get(id) as any
+      if (row && row.content_type === 'image' && row.content.startsWith('miniclip-img://')) {
+        const filename = new URL(row.content).hostname
+        const filepath = path.join(app.getPath('userData'), 'images', filename)
+        if (fs.existsSync(filepath)) fs.unlinkSync(filepath)
+      }
+    } catch(e) {
+      log.error('Failed to delete image file', e)
+    }
     getDb().prepare('DELETE FROM clipboard_history WHERE id = ?').run(id)
   })
 
@@ -534,8 +616,21 @@ app.whenReady().then(() => {
   })
 
   // --- Clipboard Monitoring ---
-  let lastText = clipboard.readText()
+  let lastText = ''
   let lastImageHash = ''
+
+  try {
+    const lastItem = getDb().prepare('SELECT content, content_type, hash FROM clipboard_history ORDER BY id DESC LIMIT 1').get() as any
+    if (lastItem) {
+      if (lastItem.content_type === 'text') {
+        lastText = lastItem.content
+      } else if (lastItem.content_type === 'image') {
+        lastImageHash = lastItem.hash || ''
+      }
+    }
+  } catch (e) {
+    log.error('Failed to init last state from DB:', e)
+  }
 
   setInterval(() => {
     const clipboardFormats = clipboard.availableFormats()
@@ -572,16 +667,26 @@ app.whenReady().then(() => {
               return
             }
 
-            // Save image to DB - store the data URL for display and raw data for copying
-            const stmt = getDb().prepare('INSERT INTO clipboard_history (content, image_data, content_type, original_format) VALUES (?, ?, ?, ?)')
-            stmt.run(image.toDataURL(), imageData, 'image', originalFormat)
+            // Save image to disk and store the custom protocol URL in DB
+            const IMAGES_DIR = path.join(app.getPath('userData'), 'images')
+            if (!fs.existsSync(IMAGES_DIR)) fs.mkdirSync(IMAGES_DIR, { recursive: true })
+            
+            const filename = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}.png`
+            const filepath = path.join(IMAGES_DIR, filename)
+            fs.writeFileSync(filepath, imageData)
+            
+            const imgUrl = `miniclip-img://${filename}`
 
-            // Always trim DB by default
-            getDb().prepare('DELETE FROM clipboard_history WHERE id NOT IN (SELECT id FROM clipboard_history ORDER BY id DESC LIMIT ?)').run(settings.maxHistorySize)
+            // We no longer store image_data in DB for new images
+            const stmt = getDb().prepare('INSERT INTO clipboard_history (content, content_type, original_format, hash) VALUES (?, ?, ?, ?)')
+            stmt.run(imgUrl, 'image', originalFormat, imageHash)
 
-            // Notify Renderer
-            win?.webContents.send('clipboard-change', image.toDataURL())
-            log.info('Image saved to clipboard history')
+            // Always trim DB and associated files
+            trimHistory(settings.maxHistorySize)
+
+            // Notify Renderer with the protocol URL instead of base64
+            win?.webContents.send('clipboard-change', imgUrl)
+            log.info(`Image saved to clipboard history (${imageSizeKB.toFixed(1)}KB) -> ${filename}`)
           } catch (e) {
             log.error('DB Image Insert Error:', e)
           }
@@ -598,7 +703,7 @@ app.whenReady().then(() => {
         stmt.run(text, 'text')
 
         // Always trim DB by default
-        getDb().prepare('DELETE FROM clipboard_history WHERE id NOT IN (SELECT id FROM clipboard_history ORDER BY id DESC LIMIT ?)').run(settings.maxHistorySize)
+        trimHistory(settings.maxHistorySize)
 
         // Notify Renderer
         win?.webContents.send('clipboard-change', text)

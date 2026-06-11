@@ -2,10 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-06-11
+
+### Added
+- **Persistent history**: sqlite on disk, also images get stored on disk rather than in memory.
+
 ## [1.2.0] - 2026-06-10
 
 ### Added
-- **Electron log**: Persistent log file in ~/.config/miniclip/logs/main.log.
+- **Electron log**: Persistent log file in app.getPath('userData')/logs/main.log.
 
 ## [1.1.7] - 2026-04-16
 
