@@ -19,7 +19,7 @@ Alternitavely grap the `.deb` or `.AppImage` from [releases](https://github.com/
 
 ## Features
 - **Modern UI**: Clean, GNOME-inspired design with system theme support.
-- **In-Memory History**: Stores text-only clipboard entries during your current session.
+- **Persistent History**: Stores entries on disk so that they persist across reboots.
 - **Image support**: Stores both text and screenshots.
 
 

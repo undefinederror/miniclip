@@ -1,5 +1,5 @@
 process.env.ELECTRON_DISABLE_SANDBOX = '1'
-import { app, BrowserWindow, ipcMain, clipboard, Tray, Menu, nativeImage, shell, protocol } from 'electron'
+import { app, BrowserWindow, ipcMain, clipboard, Tray, Menu, nativeImage, shell, protocol, ClipboardItem as ElectronClipboardItem } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
@@ -44,6 +44,18 @@ let prefsWin: BrowserWindow | null = null
 let aboutWin: BrowserWindow | null = null
 let tray: Tray | null = null
 let db: Database.Database | null = null
+let isQuitting = false
+
+interface ClipboardHistoryRow {
+  id: number
+  content: string
+  content_type: 'text' | 'image' | null
+  original_format?: string | null
+  created_at: string
+  hash?: string | null
+  image_data?: Buffer | null
+}
+
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'miniclip-img', privileges: { secure: true, standard: true, supportFetchAPI: true, bypassCSP: true } }
@@ -122,7 +134,7 @@ function getSettings(): Settings {
 function trimHistory(maxSize: number) {
   try {
     const db = getDb()
-    const rowsToDelete = db.prepare(`SELECT id, content, content_type FROM clipboard_history WHERE id NOT IN (SELECT id FROM clipboard_history ORDER BY id DESC LIMIT ?)`).all(maxSize) as any[]
+    const rowsToDelete = db.prepare<[number], ClipboardHistoryRow>(`SELECT id, content, content_type FROM clipboard_history WHERE id NOT IN (SELECT id FROM clipboard_history ORDER BY id DESC LIMIT ?)`).all(maxSize)
     for (const row of rowsToDelete) {
       if (row.content_type === 'image' && row.content.startsWith('miniclip-img://')) {
         try {
@@ -136,6 +148,11 @@ function trimHistory(maxSize: number) {
   } catch (e) {
     log.error('Failed to trim history', e)
   }
+}
+
+async function writeImageToClipboard(buffer: Buffer) {
+  const blob = new Blob([new Uint8Array(buffer)], { type: 'image/png' })
+  await clipboard.write([new ElectronClipboardItem({ 'image/png': blob })])
 }
 
 function saveSettings(settings: Settings) {
@@ -157,7 +174,7 @@ function updateAutostart(enable: boolean) {
   // In a snap, app.getPath('home') correctly resolves to $SNAP_USER_DATA.
   // snapd monitors $SNAP_USER_DATA/.config/autostart/ and automatically manages the real autostart entry.
   const autostartDir = path.join(app.getPath('home'), '.config', 'autostart')
-  
+
   // Snap autostart requires the filename to match the app name in snapcraft.yaml (miniclip.desktop)
   const desktopFileName = process.env.SNAP_NAME ? `${APP_CLASS}.desktop` : `${APP_ID}.desktop`
   const desktopFilePath = path.join(autostartDir, desktopFileName)
@@ -406,7 +423,7 @@ function createMainWindow(show: boolean = false) {
   // Prevent closing, just hide
   win.setMenu(null) // Hide the default menu bar
   win.on('close', (event) => {
-    if (!(app as any).isQuitting) {
+    if (!isQuitting) {
       event.preventDefault()
       win?.webContents.send('window-hidden')
       win?.hide()
@@ -448,14 +465,14 @@ app.on('activate', () => {
 })
 
 app.on('before-quit', () => {
-  (app as any).isQuitting = true
+  isQuitting = true
 })
 
 app.whenReady().then(() => {
   log.info(`=== Miniclip starting up === v${app.getVersion()}`)
   log.info(`Log file: ${log.transports.file.getFile().path}`)
   const mem = process.memoryUsage()
-  log.info(`Memory on startup: RSS=${(mem.rss/1024/1024).toFixed(1)}MB heap=${(mem.heapUsed/1024/1024).toFixed(1)}/${(mem.heapTotal/1024/1024).toFixed(1)}MB`)
+  log.info(`Memory on startup: RSS=${(mem.rss / 1024 / 1024).toFixed(1)}MB heap=${(mem.heapUsed / 1024 / 1024).toFixed(1)}/${(mem.heapTotal / 1024 / 1024).toFixed(1)}MB`)
 
   const IMAGES_DIR = path.join(app.getPath('userData'), 'images')
   if (!fs.existsSync(IMAGES_DIR)) fs.mkdirSync(IMAGES_DIR, { recursive: true })
@@ -504,8 +521,8 @@ app.whenReady().then(() => {
 
   ipcMain.handle('get-history', () => {
     const settings = getSettings()
-    const stmt = getDb().prepare('SELECT * FROM clipboard_history ORDER BY id DESC LIMIT ?')
-    const rows = stmt.all(settings.maxHistorySize) as ClipboardItem[]
+    const stmt = getDb().prepare<[number], ClipboardHistoryRow>('SELECT * FROM clipboard_history ORDER BY id DESC LIMIT ?')
+    const rows = stmt.all(settings.maxHistorySize)
     return rows.map(row => ({
       ...row,
       image_data: undefined, // no longer sending raw buffer to renderer
@@ -515,11 +532,11 @@ app.whenReady().then(() => {
     }))
   })
 
-  ipcMain.handle('copy-to-clipboard', (_event, itemId: number) => {
+  ipcMain.handle('copy-to-clipboard', async (_event, itemId: number) => {
     // Retrieve the item from database using the ID
     try {
-      const stmt = getDb().prepare('SELECT * FROM clipboard_history WHERE id = ?')
-      const row = stmt.get(itemId) as ClipboardItem | undefined
+      const stmt = getDb().prepare<[number], ClipboardHistoryRow>('SELECT * FROM clipboard_history WHERE id = ?')
+      const row = stmt.get(itemId)
 
       if (!row) {
         log.error('Item not found in database')
@@ -536,24 +553,26 @@ app.whenReady().then(() => {
         // causing the item to disappear after being deleted from the old position.
         lastImageHash = ''
 
+
+
         if (row.content.startsWith('miniclip-img://')) {
           try {
             const filename = new URL(row.content).hostname
             const filepath = path.join(app.getPath('userData'), 'images', filename)
-            const imageFromFile = nativeImage.createFromPath(filepath)
-            if (!imageFromFile.isEmpty()) {
-              clipboard.writeImage(imageFromFile)
+            const buffer = fs.readFileSync(filepath)
+            if (buffer.length > 0) {
+              await writeImageToClipboard(buffer)
               log.info('Successfully copied image from file')
               return
             } else {
               log.error('Failed to create image from file path')
             }
-          } catch(e) { log.error('Error copying image from file:', e) }
+          } catch (e) { log.error('Error copying image from file:', e) }
         } else if (row.image_data) {
           // Fallback to legacy database blob
-          const imageFromData = nativeImage.createFromBuffer(Buffer.from(row.image_data))
-          if (!imageFromData.isEmpty()) {
-            clipboard.writeImage(imageFromData)
+          const buffer = Buffer.from(row.image_data)
+          if (buffer.length > 0) {
+            await writeImageToClipboard(buffer)
             log.info('Successfully copied image from legacy raw data')
             return
           } else {
@@ -565,16 +584,17 @@ app.whenReady().then(() => {
 
         // Fallback to data URL if raw data fails
         log.warn('Falling back to data URL method')
-        const image = nativeImage.createFromDataURL(row.content)
-        if (!image.isEmpty()) {
-          clipboard.writeImage(image)
+        const base64Data = row.content.replace(/^data:image\/\w+;base64,/, '')
+        const buffer = Buffer.from(base64Data, 'base64')
+        if (buffer.length > 0) {
+          await writeImageToClipboard(buffer)
           log.info('Successfully copied image from data URL')
         } else {
           log.error('Failed to create image from data URL')
         }
       } else {
         // Handle text copying
-        clipboard.writeText(row.content)
+        await clipboard.writeText(row.content)
         log.info('Successfully copied text from database')
       }
     } catch (e) {
@@ -584,14 +604,14 @@ app.whenReady().then(() => {
 
   ipcMain.handle('delete-history-item', (_event, id: number) => {
     try {
-      const stmt = getDb().prepare('SELECT content, content_type FROM clipboard_history WHERE id = ?')
-      const row = stmt.get(id) as any
+      const stmt = getDb().prepare<[number], ClipboardHistoryRow>('SELECT content, content_type FROM clipboard_history WHERE id = ?')
+      const row = stmt.get(id)
       if (row && row.content_type === 'image' && row.content.startsWith('miniclip-img://')) {
         const filename = new URL(row.content).hostname
         const filepath = path.join(app.getPath('userData'), 'images', filename)
         if (fs.existsSync(filepath)) fs.unlinkSync(filepath)
       }
-    } catch(e) {
+    } catch (e) {
       log.error('Failed to delete image file', e)
     }
     getDb().prepare('DELETE FROM clipboard_history WHERE id = ?').run(id)
@@ -620,7 +640,7 @@ app.whenReady().then(() => {
   let lastImageHash = ''
 
   try {
-    const lastItem = getDb().prepare('SELECT content, content_type, hash FROM clipboard_history ORDER BY id DESC LIMIT 1').get() as any
+    const lastItem = getDb().prepare<[], ClipboardHistoryRow>('SELECT content, content_type, hash FROM clipboard_history ORDER BY id DESC LIMIT 1').get()
     if (lastItem) {
       if (lastItem.content_type === 'text') {
         lastText = lastItem.content
@@ -632,16 +652,27 @@ app.whenReady().then(() => {
     log.error('Failed to init last state from DB:', e)
   }
 
-  setInterval(() => {
-    const clipboardFormats = clipboard.availableFormats()
-    const hasImage = clipboardFormats.some(format => format.startsWith('image/'))
-    const text = clipboard.readText()
+  setInterval(async () => {
+    try {
+      let imageData: Buffer | null = null
+      try {
+        const items = await clipboard.read()
+        for (const item of items) {
+          const imageType = item.types.find(t => t.startsWith('image/'))
+          if (imageType) {
+            const blob = await item.getType(imageType) as Blob
+            imageData = Buffer.from(await blob.arrayBuffer())
+            break
+          }
+        }
+      } catch (e) {
+        // Ignore read errors
+      }
 
-    if (hasImage) {
-      const image = clipboard.readImage()
-      if (!image.isEmpty()) {
+      const text = await clipboard.readText()
+
+      if (imageData && imageData.length > 0) {
         // Create a hash to detect changes
-        const imageData = image.toPNG()
         const imageHash = crypto.createHash('md5').update(imageData).digest('hex')
 
         if (imageHash !== lastImageHash) {
@@ -650,16 +681,6 @@ app.whenReady().then(() => {
           const settings = getSettings()
 
           try {
-            // Detect original format
-            const originalFormat = clipboardFormats.find(format => format.startsWith('image/'))
-
-            let imageData: Buffer
-            if (originalFormat === 'image/jpeg' || originalFormat === 'image/jpg') {
-              imageData = image.toJPEG(90)
-            } else {
-              imageData = image.toPNG()
-            }
-
             // Check image size limit
             const imageSizeKB = imageData.length / 1024
             if (settings.maxImageSize > 0 && imageSizeKB > settings.maxImageSize) {
@@ -670,16 +691,16 @@ app.whenReady().then(() => {
             // Save image to disk and store the custom protocol URL in DB
             const IMAGES_DIR = path.join(app.getPath('userData'), 'images')
             if (!fs.existsSync(IMAGES_DIR)) fs.mkdirSync(IMAGES_DIR, { recursive: true })
-            
+
             const filename = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}.png`
             const filepath = path.join(IMAGES_DIR, filename)
             fs.writeFileSync(filepath, imageData)
-            
+
             const imgUrl = `miniclip-img://${filename}`
 
             // We no longer store image_data in DB for new images
             const stmt = getDb().prepare('INSERT INTO clipboard_history (content, content_type, original_format, hash) VALUES (?, ?, ?, ?)')
-            stmt.run(imgUrl, 'image', originalFormat, imageHash)
+            stmt.run(imgUrl, 'image', 'image/png', imageHash)
 
             // Always trim DB and associated files
             trimHistory(settings.maxHistorySize)
@@ -692,25 +713,27 @@ app.whenReady().then(() => {
           }
         }
       }
-    }
-    // Handle text content (only if no image)
-    else if (text && text !== lastText) {
-      lastText = text
-      const settings = getSettings()
-      // Save text to DB
-      try {
-        const stmt = getDb().prepare('INSERT INTO clipboard_history (content, content_type) VALUES (?, ?)')
-        stmt.run(text, 'text')
+      // Handle text content (only if no image)
+      else if (text && text !== lastText) {
+        lastText = text
+        const settings = getSettings()
+        // Save text to DB
+        try {
+          const stmt = getDb().prepare('INSERT INTO clipboard_history (content, content_type) VALUES (?, ?)')
+          stmt.run(text, 'text')
 
-        // Always trim DB by default
-        trimHistory(settings.maxHistorySize)
+          // Always trim DB by default
+          trimHistory(settings.maxHistorySize)
 
-        // Notify Renderer
-        win?.webContents.send('clipboard-change', text)
-        log.info('Text saved to clipboard history')
-      } catch (e) {
-        log.error('DB Insert Error:', e)
+          // Notify Renderer
+          win?.webContents.send('clipboard-change', text)
+          log.info('Text saved to clipboard history')
+        } catch (e) {
+          log.error('DB Insert Error:', e)
+        }
       }
+    } catch (err) {
+      log.error('Error in clipboard monitor:', err)
     }
   }, 500) // Reduced from 1000ms to 500ms for faster detection
 })

@@ -45,30 +45,33 @@
     "releaseType": "release"
   },
   beforePack:"./scripts/fix-appimage.mjs",
-  "snap": {
-    "autoStart": true,
-    "confinement": "strict",
-    "grade": "stable",
-    "base": "core22",
-    "summary": "A simple clipboard manager for Linux with history tracking",
-    "description": "Miniclip is a simple clipboard manager for Linux. It monitors your clipboard and stores a history of entries (text and images) so you can quickly access previously copied items.\n\nKey features:\n- Clipboard history tracking\n- Text and image support\n- System tray integration\n- Quick access via global shortcut",
-    "plugs": [
-      "home",
-      "desktop",
-      "desktop-legacy",
-      "x11",
-      "wayland",
-      "browser-support",
-      "system-observe",
-      {
-        "shmem": {
-          "interface": "shared-memory",
-          "private": true
+  "snapcraft": {
+    "base": "core24",
+    "core24": {
+      "useDestructiveMode": true,
+      "autoStart": true,
+      "confinement": "strict",
+      "grade": "stable",
+      "summary": "A simple clipboard manager for Linux with history tracking",
+      "description": "Miniclip is a simple clipboard manager for Linux. It monitors your clipboard and stores a history of entries (text and images) so you can quickly access previously copied items.\n\nKey features:\n- Clipboard history tracking\n- Text and image support\n- System tray integration\n- Quick access via global shortcut",
+      "plugs": [
+        "home",
+        "desktop",
+        "desktop-legacy",
+        "x11",
+        "wayland",
+        "browser-support",
+        "system-observe",
+        {
+          "shmem": {
+            "interface": "shared-memory",
+            "private": true
+          }
         }
+      ],
+      "environment": {
+        "TMPDIR": "$XDG_RUNTIME_DIR"
       }
-    ],
-    "environment": {
-      "TMPDIR": "$XDG_RUNTIME_DIR"
     },
     "publish": [
       {

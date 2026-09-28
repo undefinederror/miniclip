@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-09-29
+
+### Added
+- **Upgraded packages**: migrated to core24, updated better-sqlite and Electron.
+
 ## [1.3.0] - 2026-06-11
 
 ### Added
