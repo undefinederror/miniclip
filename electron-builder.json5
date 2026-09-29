@@ -31,6 +31,7 @@
     "icon": "public/icon.png",
     "synopsis": "A simple clipboard manager for Linux with history tracking",
     "description": "Miniclip is a simple clipboard manager for Linux. Keep track of your clipboard history and quickly access previously copied items.",
+    "syncDesktopName": true,
     "desktop": {
       "entry": {
         "Keywords": "clipboard;copy;paste;history;",

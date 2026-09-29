@@ -1,0 +1,13 @@
+--- a/node_modules/app-builder-lib/out/targets/snap/core24.js	2026-09-29 15:12:37.193312906 +0200
++++ b/node_modules/app-builder-lib/out/targets/snap/core24.js	2026-09-29 15:12:30.937192035 +0200
+@@ -229,7 +229,9 @@
+             plugs: appPlugs,
+             slots: appSlots,
+             autostart: options.autoStart ? `${desktopBaseName}.desktop` : undefined,
+-            desktop: `meta/gui/${desktopBaseName}.desktop`,
++            // desktop field intentionally omitted: snapcraft auto-detects from snap/gui/
++            // Setting it causes a 'file does not exist' error in snapcraft 9 destructive mode.
++            // See: https://github.com/electron-userland/electron-builder/pull/10176
+             extensions: resolvedExtensions,
+         };
+         // Icon path — build-time relative path so snapcraft can find the file in snap/gui/

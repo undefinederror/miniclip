@@ -2,7 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.3.0] - 2026-09-29
+## [1.3.2] - 2026-09-29
+
+### Fixed
+- **Snap built**:  apply upstream patch for destructive-mode desktop file bug".
+
+## [1.3.1] - 2026-09-29
 
 ### Added
 - **Upgraded packages**: migrated to core24, updated better-sqlite and Electron.
