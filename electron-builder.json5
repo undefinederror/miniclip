@@ -49,7 +49,7 @@
   "snapcraft": {
     "base": "core24",
     "core24": {
-      "useDestructiveMode": true,
+      "useLXD": true,
       "autoStart": true,
       "confinement": "strict",
       "grade": "stable",

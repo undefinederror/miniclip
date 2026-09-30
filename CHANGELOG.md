@@ -2,10 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.3.2] - 2026-09-29
+## [1.3.2] - 2026-09-30
 
 ### Fixed
-- **Snap built**:  apply upstream patch for destructive-mode desktop file bug".
+- **Snap built**: use canonical/setup-lxd to enable proper core24 LXD builds.
 
 ## [1.3.1] - 2026-09-29
 

@@ -21,6 +21,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Setup LXD
+        uses: canonical/setup-lxd@v0.1.2
+        with:
+          channel: latest/stable
+
       - name: Install Snapcraft
         uses: samuelmeuli/action-snapcraft@v2
 
