@@ -2,10 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.3-alpha.0] - 2026-10-07
+
+### Fixed
+- **Snap build**: Fixed the Snap build by removing an invalid Electron Builder 26.x desktop-file mapping. The workaround is applied in scripts/build.mjs; upstream fix tracked in electron-builder #10077 / #10176.
+- **CI**: added `canonical/setup-lxd` so core24 snap builds run in a managed LXD instance.
+
 ## [1.3.2] - 2026-09-30
 
 ### Fixed
-- **Snap built**: use canonical/setup-lxd to enable proper core24 LXD builds.
+- **Snap build**: use canonical/setup-lxd to enable proper core24 LXD builds. 
 
 ## [1.3.1] - 2026-09-29
 

@@ -34,8 +34,7 @@
     "syncDesktopName": true,
     "desktop": {
       "entry": {
-        "Keywords": "clipboard;copy;paste;history;",
-        "StartupWMClass": "miniclip"
+        "Keywords": "clipboard;copy;paste;history;"
       }
     },
     "artifactName": "miniclip-${version}-x86_64.${ext}"
