@@ -2,11 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.3.3-alpha.0] - 2026-10-07
+## [1.3.3] - 2026-10-07
 
 ### Fixed
 - **Snap build**: Fixed the Snap build by removing an invalid Electron Builder 26.x desktop-file mapping. The workaround is applied in scripts/build.mjs; upstream fix tracked in electron-builder #10077 / #10176.
 - **CI**: added `canonical/setup-lxd` so core24 snap builds run in a managed LXD instance.
+- **Snap (dock icon / app name)**: the dock showed a generic gear icon and the raw app id (`com.miniclip.app`) for the snap. Linux desktops link a window to its `.desktop` entry by app id, and snapd installs a snap's desktop file as `<snap>_<file>.desktop` (`miniclip_com.miniclip.app.desktop`), which can never match the app id `com.miniclip.app`. The app now renames its app id to `<snap instance>_<desktop file>` when running as a snap (`app.setDesktopName()` in `electron/main.ts`), so Wayland sessions match on app id and X11 sessions match through `StartupWMClass` — which is set per-snap (`snapcraft.core24.desktop.entry`) because it has to follow the renamed app id. deb/AppImage builds keep `com.miniclip.app`, which is what their desktop files are called, and are unchanged. Existing pinned/dock entries may need re-pinning once.
+- **Snap builds**: dropped the `{ provider: "github" }` entry from `snapcraft.publish`, it was inert for snaps and confusing.
+
+### Changed
+- **Releases**: prerelease versions (any version with a `-`, e.g. `1.3.3-alpha.0`) now publish to the Snap Store `edge` channel and are flagged as GitHub pre-releases. Full releases keep going to `stable` as a normal release. The channel/release-type selection is derived from the version in `scripts/build.mjs`.
 
 ## [1.3.2] - 2026-09-30
 

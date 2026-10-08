@@ -39,6 +39,23 @@ const APP_CLASS = 'miniclip'
 app.setName(APP_CLASS)
 app.setAppUserModelId(APP_ID)
 
+// Snap: desktop environments link a running window to its .desktop entry by app id, and that
+// app id has to equal the basename of the desktop file. snapd installs a snap desktop file as
+// "<instance>_<file>.desktop" (here miniclip_com.miniclip.app.desktop), so rename the app id
+// to match for snaps -- otherwise the dock falls back to a generic icon and the raw app id
+// instead of the Miniclip icon and name.
+// Forcing the X11 backend instead is not an option: snapcraft 9 rejects "=" in
+// apps.<app>.command (so snapcraft.core24.forceX11 is unusable), "--ozone-platform x11" is
+// ignored by Chromium, XDG_SESSION_TYPE is stripped from the environment by snapd even when
+// the snap declares it, and appendSwitch() runs too late (ozone is initialised before the
+// main script). See snapcraft.core24.desktop.entry in electron-builder.json5 for the matching
+// StartupWMClass that is used on X11 sessions.
+// Must run before the first window is created. Non-snap builds (deb/AppImage) keep
+// "com.miniclip.app", which is what their desktop files are named, so they already match.
+if (process.env.SNAP_NAME) {
+  const snapInstance = process.env.SNAP_INSTANCE_NAME || process.env.SNAP_NAME
+  app.setDesktopName(`${snapInstance}_${APP_ID}.desktop`)
+}
 let win: BrowserWindow | null
 let prefsWin: BrowserWindow | null = null
 let aboutWin: BrowserWindow | null = null

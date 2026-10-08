@@ -49,6 +49,17 @@
     "base": "core24",
     "core24": {
       "useLXD": true,
+      // When running as a snap the app renames its app id to
+      // "<snap instance>_<desktop file>.desktop" (see electron/main.ts) so that Linux
+      // desktops can link its windows to the desktop file snapd installs as
+      // miniclip_com.miniclip.app.desktop. X11 sessions match on WM_CLASS instead, so keep
+      // StartupWMClass in sync with that renamed id. deb/AppImage keep the linux.desktop /
+      // desktopName value, which already matches their app id.
+      "desktop": {
+        "entry": {
+          "StartupWMClass": "miniclip_com.miniclip.app"
+        }
+      },
       "autoStart": true,
       "confinement": "strict",
       "grade": "stable",
@@ -70,6 +81,9 @@
         }
       ],
       "environment": {
+        // NOTE: do not try to force the X11/XWayland backend from here. snapd strips
+        // XDG_SESSION_TYPE from the app environment even when a snap declares it, so the
+        // appendSwitch('ozone-platform', 'x11') call in electron/main.ts does it instead.
         "TMPDIR": "$XDG_RUNTIME_DIR"
       }
     },
@@ -78,9 +92,6 @@
         "provider": "snapStore",
         "channels": "stable"
       },
-      {
-        "provider": "github"
-      }
     ]
   }
 }
