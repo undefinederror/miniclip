@@ -95,6 +95,7 @@ try {
     SnapCore24.prototype.createDescriptor = async function createDescriptor(arch) {
       const descriptor = await original.call(this, arch)
       stripRedundantSnapDesktopMapping(descriptor)
+      this.helper.getDesktopFileName = () => this.packager.executableName
       return descriptor
     }
   }

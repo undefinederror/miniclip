@@ -7,7 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - **Snap build**: Fixed the Snap build by removing an invalid Electron Builder 26.x desktop-file mapping. The workaround is applied in scripts/build.mjs; upstream fix tracked in electron-builder #10077 / #10176.
 - **CI**: added `canonical/setup-lxd` so core24 snap builds run in a managed LXD instance.
-- - **Snap (dock icon / app name)**: fixed the dock icon and name (matching now goes through `StartupWMClass`, which needs an underscore-free app id).
+- - **Snap (dock icon / app name)**: fixed the dock icon and name. The snap's desktop file is now named after the app (`miniclip.desktop`) so GNOME can link snap windows to it; `StartupWMClass` keeps X11 sessions matched too.
 - **Snap builds**: dropped the `{ provider: "github" }` entry from `snapcraft.publish`, it was inert for snaps and confusing.
 
 ### Changed
