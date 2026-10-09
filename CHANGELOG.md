@@ -2,13 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.4] - 2026-10-09
+
+### Fixed
+- **Snap autostart**: re-enabled autostart option and fixed name mismatch in snap.
+
 ## [1.3.3] - 2026-10-07
 
 ### Fixed
 - **Snap build**: Fixed the Snap build by removing an invalid Electron Builder 26.x desktop-file mapping. The workaround is applied in scripts/build.mjs; upstream fix tracked in electron-builder #10077 / #10176.
 - **CI**: added `canonical/setup-lxd` so core24 snap builds run in a managed LXD instance.
-- - **Snap (dock icon / app name)**: fixed the dock icon and name. The snap's desktop file is now named after the app (`miniclip.desktop`) so GNOME can link snap windows to it; `StartupWMClass` keeps X11 sessions matched too.
-- **Snap builds**: dropped the `{ provider: "github" }` entry from `snapcraft.publish`, it was inert for snaps and confusing.
+- **Snap (dock icon / app name)**: fixed the dock icon and name. The snap's desktop file is now named after the app (`miniclip.desktop`) so GNOME can link snap windows to it; `StartupWMClass` keeps X11 sessions matched too.
 
 ### Changed
 - **Releases**: prerelease versions (any version with a `-`, e.g. `1.3.3-alpha.0`) now publish to the Snap Store `edge` channel and are flagged as GitHub pre-releases. Full releases keep going to `stable` as a normal release. The channel/release-type selection is derived from the version in `scripts/build.mjs`.
