@@ -7,6 +7,7 @@ function App() {
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [search, setSearch] = useState("");
   const listRef = useRef<HTMLUListElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Load items from DB
   const refreshItems = async () => {
@@ -36,10 +37,17 @@ function App() {
       setSelectedIndex(-1);
     });
 
+    // Focus input when window regains focus
+    const handleWindowFocus = () => {
+      inputRef.current?.focus();
+    };
+    window.addEventListener('focus', handleWindowFocus);
+
     return () => {
       unsubscribeClipboard();
       unsubscribeSettings();
       unsubscribeWindowHidden();
+      window.removeEventListener('focus', handleWindowFocus);
     };
   }, []);
 
@@ -146,6 +154,7 @@ function App() {
       <div className="p-3 flex flex-col flex-1 overflow-hidden">
         <div className="mb-4 p-1">
           <input
+            ref={inputRef}
             type="text"
             className="w-full bg-gnome-input border border-gnome-border rounded-lg p-2.5 text-gnome-text focus:outline-none focus:ring-2 focus:ring-gnome-accent/50 transition-all shadow-sm"
             placeholder="Search clipboard history..."

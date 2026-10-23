@@ -63,7 +63,6 @@ interface ClipboardHistoryRow {
   original_format?: string | null
   created_at: string
   hash?: string | null
-  image_data?: Buffer | null
 }
 
 
@@ -108,7 +107,6 @@ function getDb(): Database.Database {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       content TEXT NOT NULL,
       timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-      image_data BLOB,
       content_type TEXT DEFAULT 'text',
       original_format TEXT
     )
@@ -125,6 +123,13 @@ function getDb(): Database.Database {
     db.exec('ALTER TABLE clipboard_history ADD COLUMN hash TEXT')
   } catch (e) {
     // Ignore if column already exists
+  }
+
+  // Migration: drop unused image_data column
+  try {
+    db.exec('ALTER TABLE clipboard_history DROP COLUMN image_data')
+  } catch (e) {
+    // Ignore if column doesn't exist or already dropped
   }
 
   return db
@@ -456,6 +461,34 @@ function createMainWindow(show: boolean = false) {
   }
 }
 
+function unlockClipboardAccess() {
+  // On Wayland, clipboard reads are blocked for clients with no visible (mapped)
+  // window. Briefly showing a window grants clipboard access for the whole
+  // session (persists even after the window is hidden/destroyed).
+  const unlockWin = new BrowserWindow({
+    width: 0,
+    height: 0,
+    show: false,
+    skipTaskbar: true,
+    resizable: false,
+    movable: false,
+    frame: false,
+    webPreferences: {},
+  })
+  unlockWin.loadURL('about:blank')
+  unlockWin.once('ready-to-show', () => {
+    unlockWin.show()
+    unlockWin.focus()
+    log.info('Unlock window shown and focused')
+    setTimeout(() => {
+      if (!unlockWin.isDestroyed()) {
+        unlockWin.destroy()
+        log.info('Unlock window destroyed')
+      }
+    }, 500)
+  })
+}
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
@@ -512,6 +545,7 @@ app.whenReady().then(() => {
   createMainWindow(getSettings().firstLaunch)
   saveSettings({ ...getSettings(), firstLaunch: false })
   win?.focus()
+  unlockClipboardAccess()
   // Start hidden on login/launch
 
   // --- IPC Handlers ---
@@ -533,13 +567,34 @@ app.whenReady().then(() => {
     const settings = getSettings()
     const stmt = getDb().prepare<[number], ClipboardHistoryRow>('SELECT * FROM clipboard_history ORDER BY id DESC LIMIT ?')
     const rows = stmt.all(settings.maxHistorySize)
-    return rows.map(row => ({
-      ...row,
-      image_data: undefined, // no longer sending raw buffer to renderer
-      content_size: row.content_type === 'image'
-        ? 0 // or we could stat the file, but 0 is fine for display
-        : Buffer.byteLength(row.content, 'utf-8'),
-    }))
+    const IMAGES_DIR = path.join(app.getPath('userData'), 'images')
+    
+    return rows.map(row => {
+      let content_size = 0
+      
+      if (row.content_type === 'image') {
+        // For images, stat the file to get actual size
+        if (row.content.startsWith('miniclip-img://')) {
+          try {
+            const filename = new URL(row.content).hostname
+            const filepath = path.join(IMAGES_DIR, filename)
+            const stats = fs.statSync(filepath)
+            content_size = stats.size
+          } catch (e) {
+            // File missing or invalid URL, size stays 0
+            content_size = 0
+          }
+        }
+      } else {
+        // For text, calculate byte length
+        content_size = Buffer.byteLength(row.content, 'utf-8')
+      }
+      
+      return {
+        ...row,
+        content_size,
+      }
+    })
   })
 
   ipcMain.handle('copy-to-clipboard', async (_event, itemId: number) => {
@@ -578,16 +633,6 @@ app.whenReady().then(() => {
               log.error('Failed to create image from file path')
             }
           } catch (e) { log.error('Error copying image from file:', e) }
-        } else if (row.image_data) {
-          // Fallback to legacy database blob
-          const buffer = Buffer.from(row.image_data)
-          if (buffer.length > 0) {
-            await writeImageToClipboard(buffer)
-            log.info('Successfully copied image from legacy raw data')
-            return
-          } else {
-            log.error('Failed to create image from raw data buffer')
-          }
         } else {
           log.error('No image data found in database')
         }
@@ -665,9 +710,11 @@ app.whenReady().then(() => {
   setInterval(async () => {
     try {
       let imageData: Buffer | null = null
+      let itemTypes: string[] = []
       try {
         const items = await clipboard.read()
         for (const item of items) {
+          itemTypes.push(...item.types)
           const imageType = item.types.find(t => t.startsWith('image/'))
           if (imageType) {
             const blob = await item.getType(imageType) as Blob
@@ -676,14 +723,24 @@ app.whenReady().then(() => {
           }
         }
       } catch (e) {
-        // Ignore read errors
+        log.error('Clipboard image read error:', e)
       }
 
       const text = await clipboard.readText()
 
+      // Cross-check via clipboard.has()
+      const hasImageMime = await clipboard.has('image/png').catch(() => false)
+      const hasTextMime = await clipboard.has('text/plain').catch(() => false)
+
+      // Debug: log clipboard state on each poll (always log when anything is present)
+      if (itemTypes.length > 0 || imageData || (text && text.length > 0) || hasImageMime || hasTextMime) {
+        log.debug('Clipboard poll: webTypes=[' + itemTypes.join(',') + '] webImage=' + (imageData ? imageData.length + 'B' : 'none') + ' hasImageMime=' + hasImageMime + ' hasTextMime=' + hasTextMime + ' text=' + (text && text.length > 0 ? JSON.stringify(text.substring(0, 50)) : 'none'))
+      }
+
       if (imageData && imageData.length > 0) {
         // Create a hash to detect changes
         const imageHash = crypto.createHash('md5').update(imageData).digest('hex')
+        log.debug('Image hash: current=' + imageHash.substring(0, 8) + ', last=' + (lastImageHash ? lastImageHash.substring(0, 8) : '(empty)'))
 
         if (imageHash !== lastImageHash) {
           lastImageHash = imageHash
@@ -708,7 +765,6 @@ app.whenReady().then(() => {
 
             const imgUrl = `miniclip-img://${filename}`
 
-            // We no longer store image_data in DB for new images
             const stmt = getDb().prepare('INSERT INTO clipboard_history (content, content_type, original_format, hash) VALUES (?, ?, ?, ?)')
             stmt.run(imgUrl, 'image', 'image/png', imageHash)
 

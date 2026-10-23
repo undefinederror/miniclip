@@ -7,7 +7,6 @@ declare global {
         id: number;
         content: string;
         timestamp: string;
-        image_data?: Buffer;
         content_type: 'text' | 'image';
         original_format?: string;
         content_size: number;

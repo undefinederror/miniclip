@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.5] - 2026-10-23
+
+### Fixed
+- **Image size display**: correctly show size
+- **Search autofocus**: added explicit focus() on input when the window ragains focus (miniclip show), since autoFocus attribute only works on first mount
+- **Polling**: shows a mock window on startup so to gain access to gain background clipboard reads (Wayland)
+
 ## [1.3.4] - 2026-10-09
 
 ### Fixed
