@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 
 // Interface definitions moved to vite-env.d.ts
 
@@ -19,6 +19,11 @@ function App() {
     }
   };
 
+  const focusInput = useCallback(() => {
+    setSelectedIndex(-1);
+    inputRef.current?.focus();
+  }, []);
+
   useEffect(() => {
     refreshItems();
 
@@ -37,24 +42,19 @@ function App() {
       setSelectedIndex(-1);
     });
 
-    // Focus input when window regains focus
-    const handleWindowFocus = () => {
-      inputRef.current?.focus();
-    };
-    window.addEventListener('focus', handleWindowFocus);
+    window.addEventListener("focus", focusInput);
 
     return () => {
       unsubscribeClipboard();
       unsubscribeSettings();
       unsubscribeWindowHidden();
-      window.removeEventListener('focus', handleWindowFocus);
+      window.removeEventListener("focus", focusInput);
     };
   }, []);
 
-  // Filter items - only show text items when searching, but always show images
   const filteredItems = items.filter((item) => {
-    if (item.content_type === 'image') {
-      return true; // Always show images regardless of search
+    if (item.content_type === "image") {
+      return false;
     }
     return item.content.toLowerCase().includes(search.toLowerCase());
   });
@@ -99,33 +99,41 @@ function App() {
   // Handle Keyboard Navigation
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        await window.electronAPI.hideWindow();
+      }
+
       if (e.key === "ArrowDown") {
-        e.preventDefault();
+        inputRef.current?.blur();
         setSelectedIndex((prev) => {
           if (prev === -1) return 0;
           return Math.min(prev + 1, filteredItems.length - 1);
         });
       } else if (e.key === "ArrowUp") {
-        e.preventDefault();
+        inputRef.current?.blur();
         setSelectedIndex((prev) => {
+          if (prev === 0) focusInput();
           if (prev === -1) return filteredItems.length - 1;
           return Math.max(prev - 1, 0);
         });
-      } else if (e.key === "Enter") {
-        e.preventDefault();
+      }
+
+      if (document.activeElement === inputRef.current) return;
+
+      if (e.key === "Enter") {
         const item = filteredItems[selectedIndex];
         if (item) {
           handleSelectItem(item);
           handleDeleteItem(item.id);
         }
       } else if (e.key === "Delete") {
-        e.preventDefault();
         const item = filteredItems[selectedIndex];
         if (item) {
           handleDeleteItem(item.id);
         }
-      } else if (e.key === "Escape") {
-        await window.electronAPI.hideWindow();
+      } else if (e.key === "/") {
+        e.preventDefault();
+        focusInput();
       }
     };
 
@@ -138,7 +146,7 @@ function App() {
     if (listRef.current && selectedIndex !== -1) {
       const el = listRef.current.children[selectedIndex] as HTMLElement;
       if (el) {
-        el.scrollIntoView({ block: 'nearest' });
+        el.scrollIntoView({ block: "nearest" });
       }
     }
   }, [selectedIndex]);
@@ -159,6 +167,7 @@ function App() {
             className="w-full bg-gnome-input border border-gnome-border rounded-lg p-2.5 text-gnome-text focus:outline-none focus:ring-2 focus:ring-gnome-accent/50 transition-all shadow-sm"
             placeholder="Search clipboard history..."
             value={search}
+            onFocus={() => setSelectedIndex(-1)}
             onChange={(e) => {
               setSearch(e.target.value);
               setSelectedIndex(-1);
@@ -171,15 +180,18 @@ function App() {
           {filteredItems.map((item, index) => (
             <li
               key={item.id}
-              className={`p-2 mr-2 rounded-lg cursor-pointer transition-all break-words border ${index === selectedIndex
-                ? "outline-2 -outline-offset-2 outline-orange-500 border-transparent shadow-md bg-gnome-surface"
-                : "bg-gnome-surface hover:bg-gnome-surface/80 text-gnome-text-dim border-gnome-border/50"
-                }`}
-              onClick={() => handleSelectItem(item)}
-              onMouseEnter={() => setSelectedIndex(index)}
+              className={`p-2 mr-2 rounded-lg cursor-pointer transition-all break-words border ${
+                index === selectedIndex
+                  ? "outline-2 -outline-offset-2 outline-orange-500 border-transparent shadow-md bg-gnome-surface"
+                  : "bg-gnome-surface hover:bg-gnome-surface/80 text-gnome-text-dim border-gnome-border/50"
+              }`}
+              onClick={() => {
+                setSelectedIndex(index);
+                handleSelectItem(item);
+              }}
             >
               <div className="relative">
-                {item.content_type === 'image' ? (
+                {item.content_type === "image" ? (
                   <img
                     src={item.content}
                     alt="Clipboard image"
@@ -190,7 +202,9 @@ function App() {
                     {item.content}
                   </div>
                 )}
-                <span className={`absolute ${item.content_type === 'image' ? 'bottom-1' : '-bottom-1'} -right-1 bg-black/60 text-white text-[10px] px-1 py-0.5 rounded flex align-center leading-none`}>
+                <span
+                  className={`absolute ${item.content_type === "image" ? "bottom-1" : "-bottom-1"} -right-1 bg-black/60 text-white text-[10px] px-1 py-0.5 rounded flex align-center leading-none`}
+                >
                   {formatSize(item.content_size)}
                 </span>
               </div>
@@ -204,9 +218,24 @@ function App() {
         </ul>
 
         <div className="mt-4 text-[10px] text-gnome-text-dim flex justify-center flex-wrap gap-2 uppercase tracking-wider font-semibold opacity-70">
-          <span className="whitespace-nowrap"><span className="bg-gnome-border/70 px-1.5 py-0.5 rounded mx-1">Arrows</span> navigate</span>
-          <span className="whitespace-nowrap"><span className="bg-gnome-border/70 px-1.5 py-0.5 rounded mx-1">Enter</span> select</span>
-          <span className="whitespace-nowrap"><span className="bg-gnome-border/70 px-1.5 py-0.5 rounded ml-1">Canc</span> delete</span>
+          <span className="whitespace-nowrap">
+            <span className="bg-gnome-border/70 px-1.5 py-0.5 rounded mx-1">
+              ↓↑
+            </span>{" "}
+            move
+          </span>
+          <span className="whitespace-nowrap">
+            <span className="bg-gnome-border/70 px-1.5 py-0.5 rounded mx-1">
+              Enter
+            </span>{" "}
+            select
+          </span>
+          <span className="whitespace-nowrap">
+            <span className="bg-gnome-border/70 px-1.5 py-0.5 rounded ml-1">
+              Canc
+            </span>{" "}
+            delete
+          </span>
         </div>
       </div>
     </div>
