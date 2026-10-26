@@ -54,7 +54,7 @@ function App() {
 
   const filteredItems = items.filter((item) => {
     if (item.content_type === "image") {
-      return false;
+      return !search;
     }
     return item.content.toLowerCase().includes(search.toLowerCase());
   });

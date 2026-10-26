@@ -8,7 +8,6 @@ All notable changes to this project will be documented in this file.
 - **Image size display**: correctly show size
 - **Search autofocus**: added explicit focus() on input when the window ragains focus (miniclip show)
 - **Polling**: shows a mock window on startup so to gain access to gain background clipboard reads (Wayland)
-- **Navigation**: better focus/blur when moving from input to history items
 
 ## [1.3.4] - 2026-10-09
 

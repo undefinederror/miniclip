@@ -728,15 +728,6 @@ app.whenReady().then(() => {
 
       const text = await clipboard.readText()
 
-      // Cross-check via clipboard.has()
-      const hasImageMime = await clipboard.has('image/png').catch(() => false)
-      const hasTextMime = await clipboard.has('text/plain').catch(() => false)
-
-      // Debug: log clipboard state on each poll (always log when anything is present)
-      if (itemTypes.length > 0 || imageData || (text && text.length > 0) || hasImageMime || hasTextMime) {
-        log.debug('Clipboard poll: webTypes=[' + itemTypes.join(',') + '] webImage=' + (imageData ? imageData.length + 'B' : 'none') + ' hasImageMime=' + hasImageMime + ' hasTextMime=' + hasTextMime + ' text=' + (text && text.length > 0 ? JSON.stringify(text.substring(0, 50)) : 'none'))
-      }
-
       if (imageData && imageData.length > 0) {
         // Create a hash to detect changes
         const imageHash = crypto.createHash('md5').update(imageData).digest('hex')
