@@ -2,13 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2026-10-26
+
+### Added 
+- **Pins**: history items can be pinned/unpinned
+
+### Enhancements
+- **Images**: on disk saved as jpg
+- **Navigation**: better focus/blur when moving from input to history items
+
 ## [1.3.5] - 2026-10-26
 
 ### Fixed
 - **Image size display**: correctly show size
 - **Search autofocus**: added explicit focus() on input when the window ragains focus (miniclip show)
 - **Polling**: shows a mock window on startup so to gain access to gain background clipboard reads (Wayland)
-- **Navigation**: better focus/blur when moving from input to history items
 
 ## [1.3.4] - 2026-10-09
 

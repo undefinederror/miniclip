@@ -1,4 +1,5 @@
 import { ipcRenderer, contextBridge } from 'electron'
+import type { Settings } from '../src/shared/settings'
 
 // --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -23,11 +24,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getHistory: () => ipcRenderer.invoke('get-history'),
   copyToClipboard: (text: string) => ipcRenderer.invoke('copy-to-clipboard', text),
   deleteHistoryItem: (id: number) => ipcRenderer.invoke('delete-history-item', id),
+  togglePin: (id: number) => ipcRenderer.invoke('toggle-pin', id),
   hideWindow: () => ipcRenderer.invoke('hide-window'),
   minimizeWindow: () => ipcRenderer.invoke('minimize-window'),
   closeWindow: () => ipcRenderer.invoke('close-window'),
   getSettings: () => ipcRenderer.invoke('get-settings'),
-  setSettings: (settings: any) => ipcRenderer.invoke('set-settings', settings),
+  setSettings: (settings: Settings) => ipcRenderer.invoke('set-settings', settings),
   getVersion: () => ipcRenderer.invoke('get-version'),
   openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
 })

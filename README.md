@@ -4,12 +4,6 @@
 
 A minimal, simple, modern clipboard manager for Linux (Wayland/X11), built with Electron and React.
 
-Miniclip monitors your clipboard and stores a history of entries.
-- **Arrows**: Move across items in the list.
-- **Enter**: Copy an item back to the clipboard.
-- **Delete**: Remove an item.
-- **Filter**: Find a specific item.
-
 ## Installation
 
 ```
@@ -21,15 +15,15 @@ Alternitavely grap the `.deb` or `.AppImage` from [releases](https://github.com/
 - **Modern UI**: Clean, GNOME-inspired design with system theme support.
 - **Persistent History**: Stores entries on disk so that they persist across reboots.
 - **Image support**: Stores both text and screenshots.
-
+- **Pins**: History items can be pinned/unpinned.
 
 ## Usage
 
 Miniclip monitors your clipboard and stores a history of entries.
 - **Arrows**: Move across items in the list.
 - **Enter**: Copy an item back to the clipboard.
-- **Delete**: Remove an item.
 - **Filter**: Find a specific item.
+- **Delete**: Remove an item.
 
 When Miniclip is hidden in the system tray it can be shown by clicking the tray icon or runing:
 ```bash

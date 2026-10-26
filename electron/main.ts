@@ -5,8 +5,9 @@ import path from 'node:path'
 import fs from 'node:fs'
 import Database from 'better-sqlite3'
 import crypto from 'crypto'
-import { Settings, defaultSettings } from '../src/shared/settings'
+import { type Settings, defaultSettings } from '../src/shared/settings'
 import log from 'electron-log/main'
+import { screen } from 'electron'
 
 // --- Logging setup ---
 log.initialize()
@@ -63,6 +64,8 @@ interface ClipboardHistoryRow {
   original_format?: string | null
   created_at: string
   hash?: string | null
+  pinned?: number
+  sort_time?: number
 }
 
 
@@ -132,6 +135,27 @@ function getDb(): Database.Database {
     // Ignore if column doesn't exist or already dropped
   }
 
+  // Migration: add pinned column
+  try {
+    db.exec('ALTER TABLE clipboard_history ADD COLUMN pinned INTEGER DEFAULT 0')
+  } catch (e) {
+    // Ignore if column already exists
+  }
+
+  // Migration: add sort_time column (epoch ms, used to order pinned/unpinned)
+  try {
+    db.exec('ALTER TABLE clipboard_history ADD COLUMN sort_time INTEGER')
+  } catch (e) {
+    // Ignore if column already exists
+  }
+  // Backfill sort_time for existing rows using id (monotonic proxy for time).
+  // New rows will use Date.now() which is much larger, preserving relative order.
+  try {
+    db.prepare('UPDATE clipboard_history SET sort_time = id WHERE sort_time IS NULL').run()
+  } catch (e) {
+    log.error('Failed to backfill sort_time', e)
+  }
+
   return db
 }
 
@@ -149,7 +173,17 @@ function getSettings(): Settings {
 function trimHistory(maxSize: number) {
   try {
     const db = getDb()
-    const rowsToDelete = db.prepare<[number], ClipboardHistoryRow>(`SELECT id, content, content_type FROM clipboard_history WHERE id NOT IN (SELECT id FROM clipboard_history ORDER BY id DESC LIMIT ?)`).all(maxSize)
+    // Only count non-pinned items toward the size limit.
+    // Pinned items are exempt and never trimmed.
+    const rowsToDelete = db.prepare<[number], ClipboardHistoryRow>(
+      `SELECT id, content, content_type FROM clipboard_history
+       WHERE pinned = 0
+         AND id NOT IN (
+           SELECT id FROM clipboard_history
+           WHERE pinned = 0
+           ORDER BY id DESC LIMIT ?
+         )`
+    ).all(maxSize)
     for (const row of rowsToDelete) {
       if (row.content_type === 'image' && row.content.startsWith('miniclip-img://')) {
         try {
@@ -166,7 +200,9 @@ function trimHistory(maxSize: number) {
 }
 
 async function writeImageToClipboard(buffer: Buffer) {
-  const blob = new Blob([new Uint8Array(buffer)], { type: 'image/png' })
+  // Stored images are JPEG; re-encode to PNG for universal paste compatibility.
+  const png = nativeImage.createFromBuffer(buffer).toPNG()
+  const blob = new Blob([new Uint8Array(png)], { type: 'image/png' })
   await clipboard.write([new ElectronClipboardItem({ 'image/png': blob })])
 }
 
@@ -416,12 +452,14 @@ function createAboutWindow() {
 }
 
 function createMainWindow(show: boolean = false) {
+  const { height } = screen.getPrimaryDisplay().workAreaSize
+
   win = new BrowserWindow({
     title: `Miniclip`,
     icon: nativeImage.createFromPath(path.join(process.env.VITE_PUBLIC, 'icon.png')),
     frame: true, // Spotlight style
     width: 350,
-    height: 550,
+    height: height - 50,
     backgroundColor: '#242424', // GNOME Dark BG
     show: false, // Start hidden to prevent white flash
     webPreferences: {
@@ -565,13 +603,22 @@ app.whenReady().then(() => {
 
   ipcMain.handle('get-history', () => {
     const settings = getSettings()
-    const stmt = getDb().prepare<[number], ClipboardHistoryRow>('SELECT * FROM clipboard_history ORDER BY id DESC LIMIT ?')
+    // Pinned items always appear first.
+    // Pinned:   sort_time ASC  -> newly pinned lands at the END of pinned section
+    // Unpinned: sort_time DESC -> newly unpinned lands at the START of unpinned section
+    const stmt = getDb().prepare<[number], ClipboardHistoryRow>(
+      `SELECT * FROM clipboard_history 
+       ORDER BY pinned DESC,
+         CASE WHEN pinned = 1 THEN sort_time END ASC,
+         CASE WHEN pinned = 0 THEN sort_time END DESC
+       LIMIT ?`
+    )
     const rows = stmt.all(settings.maxHistorySize)
     const IMAGES_DIR = path.join(app.getPath('userData'), 'images')
-    
+
     return rows.map(row => {
       let content_size = 0
-      
+
       if (row.content_type === 'image') {
         // For images, stat the file to get actual size
         if (row.content.startsWith('miniclip-img://')) {
@@ -589,7 +636,7 @@ app.whenReady().then(() => {
         // For text, calculate byte length
         content_size = Buffer.byteLength(row.content, 'utf-8')
       }
-      
+
       return {
         ...row,
         content_size,
@@ -612,11 +659,13 @@ app.whenReady().then(() => {
         // Handle image copying using raw image data
         log.info('Copying image from database, ID:', itemId)
 
-        // Reset lastImageHash so the clipboard monitor will detect the
-        // re-written image as new content and re-insert it at the top of history.
-        // Without this, the hash would match and the monitor would skip re-inserting,
-        // causing the item to disappear after being deleted from the old position.
-        lastImageHash = ''
+        // Only reset lastImageHash for non-pinned items so the clipboard monitor
+        // will detect the re-written image as new content and re-insert it at the top.
+        // For pinned items, we keep the hash so the monitor skips re-insertion
+        // (the pinned item stays in place and isn't deleted).
+        if (!row.pinned) {
+          lastImageHash = ''
+        }
 
 
 
@@ -672,6 +721,20 @@ app.whenReady().then(() => {
     getDb().prepare('DELETE FROM clipboard_history WHERE id = ?').run(id)
   })
 
+  ipcMain.handle('toggle-pin', (_event, id: number) => {
+    try {
+      const db = getDb()
+      // Flip the pinned state and bump sort_time so the item re-sorts:
+      //   - pinning   -> newest sort_time among pinned  -> lands at the END of pinned section
+      //   - unpinning -> newest sort_time among unpinned -> lands at the START of unpinned section
+      db.prepare(
+        'UPDATE clipboard_history SET pinned = CASE WHEN pinned = 1 THEN 0 ELSE 1 END, sort_time = ? WHERE id = ?'
+      ).run(Date.now(), id)
+    } catch (e) {
+      log.error('Failed to toggle pin', e)
+    }
+  })
+
   ipcMain.handle('hide-window', () => {
     win?.webContents.send('window-hidden')
     win?.hide()
@@ -710,11 +773,9 @@ app.whenReady().then(() => {
   setInterval(async () => {
     try {
       let imageData: Buffer | null = null
-      let itemTypes: string[] = []
       try {
         const items = await clipboard.read()
         for (const item of items) {
-          itemTypes.push(...item.types)
           const imageType = item.types.find(t => t.startsWith('image/'))
           if (imageType) {
             const blob = await item.getType(imageType) as Blob
@@ -728,19 +789,9 @@ app.whenReady().then(() => {
 
       const text = await clipboard.readText()
 
-      // Cross-check via clipboard.has()
-      const hasImageMime = await clipboard.has('image/png').catch(() => false)
-      const hasTextMime = await clipboard.has('text/plain').catch(() => false)
-
-      // Debug: log clipboard state on each poll (always log when anything is present)
-      if (itemTypes.length > 0 || imageData || (text && text.length > 0) || hasImageMime || hasTextMime) {
-        log.debug('Clipboard poll: webTypes=[' + itemTypes.join(',') + '] webImage=' + (imageData ? imageData.length + 'B' : 'none') + ' hasImageMime=' + hasImageMime + ' hasTextMime=' + hasTextMime + ' text=' + (text && text.length > 0 ? JSON.stringify(text.substring(0, 50)) : 'none'))
-      }
-
       if (imageData && imageData.length > 0) {
         // Create a hash to detect changes
         const imageHash = crypto.createHash('md5').update(imageData).digest('hex')
-        log.debug('Image hash: current=' + imageHash.substring(0, 8) + ', last=' + (lastImageHash ? lastImageHash.substring(0, 8) : '(empty)'))
 
         if (imageHash !== lastImageHash) {
           lastImageHash = imageHash
@@ -755,25 +806,34 @@ app.whenReady().then(() => {
               return
             }
 
-            // Save image to disk and store the custom protocol URL in DB
+            // Save image to disk and store the custom protocol URL in DB.
+            // Convert to JPEG to reduce storage size (fullscreen screenshots
+            // compress from ~1MB PNG to ~0.3MB). Fall back to raw bytes if
+            // nativeImage can't decode the format.
             const IMAGES_DIR = path.join(app.getPath('userData'), 'images')
             if (!fs.existsSync(IMAGES_DIR)) fs.mkdirSync(IMAGES_DIR, { recursive: true })
 
-            const filename = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}.png`
+            const nativeImg = nativeImage.createFromBuffer(imageData)
+            const jpeg = nativeImg.isEmpty() ? Buffer.alloc(0) : nativeImg.toJPEG(90)
+            const isJpeg = jpeg.length > 0
+
+            const filename = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${isJpeg ? 'jpg' : 'png'}`
             const filepath = path.join(IMAGES_DIR, filename)
-            fs.writeFileSync(filepath, imageData)
+            fs.writeFileSync(filepath, isJpeg ? jpeg : imageData)
 
             const imgUrl = `miniclip-img://${filename}`
+            const format = isJpeg ? 'image/jpeg' : 'image/png'
 
-            const stmt = getDb().prepare('INSERT INTO clipboard_history (content, content_type, original_format, hash) VALUES (?, ?, ?, ?)')
-            stmt.run(imgUrl, 'image', 'image/png', imageHash)
+            const stmt = getDb().prepare('INSERT INTO clipboard_history (content, content_type, original_format, hash, sort_time) VALUES (?, ?, ?, ?, ?)')
+            stmt.run(imgUrl, 'image', format, imageHash, Date.now())
 
             // Always trim DB and associated files
             trimHistory(settings.maxHistorySize)
 
             // Notify Renderer with the protocol URL instead of base64
             win?.webContents.send('clipboard-change', imgUrl)
-            log.info(`Image saved to clipboard history (${imageSizeKB.toFixed(1)}KB) -> ${filename}`)
+            const storedKB = (isJpeg ? jpeg.length : imageData.length) / 1024
+            log.info(`Image saved to clipboard history (${imageSizeKB.toFixed(1)}KB -> ${storedKB.toFixed(1)}KB) -> ${filename}`)
           } catch (e) {
             log.error('DB Image Insert Error:', e)
           }
@@ -785,8 +845,8 @@ app.whenReady().then(() => {
         const settings = getSettings()
         // Save text to DB
         try {
-          const stmt = getDb().prepare('INSERT INTO clipboard_history (content, content_type) VALUES (?, ?)')
-          stmt.run(text, 'text')
+          const stmt = getDb().prepare('INSERT INTO clipboard_history (content, content_type, sort_time) VALUES (?, ?, ?)')
+          stmt.run(text, 'text', Date.now())
 
           // Always trim DB by default
           trimHistory(settings.maxHistorySize)

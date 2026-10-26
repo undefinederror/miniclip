@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
+import { PinIcon } from "./PinIcon";
 
 // Interface definitions moved to vite-env.d.ts
 
@@ -54,7 +55,7 @@ function App() {
 
   const filteredItems = items.filter((item) => {
     if (item.content_type === "image") {
-      return false;
+      return !search;
     }
     return item.content.toLowerCase().includes(search.toLowerCase());
   });
@@ -65,11 +66,14 @@ function App() {
       // The main process will handle both text and image copying logic
       await window.electronAPI.copyToClipboard(item.id);
 
-      // Delete the item from history after copying
+      // For non-pinned items: delete from history after copying.
       // The clipboard monitor will detect the re-written content,
       // re-insert it at the top, and fire onClipboardChange which
       // triggers refreshItems() automatically.
-      await window.electronAPI.deleteHistoryItem(item.id);
+      // Pinned items stay in place and are not deleted.
+      if (!item.pinned) {
+        await window.electronAPI.deleteHistoryItem(item.id);
+      }
 
       const settings = await window.electronAPI.getSettings();
       if (settings.autoCloseOnSelect) {
@@ -77,6 +81,15 @@ function App() {
       }
     } catch (err) {
       console.error("Failed to select item:", err);
+    }
+  };
+
+  const handleTogglePin = async (id: number) => {
+    try {
+      await window.electronAPI.togglePin(id);
+      await refreshItems();
+    } catch (err) {
+      console.error("Failed to toggle pin:", err);
     }
   };
 
@@ -124,12 +137,16 @@ function App() {
         const item = filteredItems[selectedIndex];
         if (item) {
           handleSelectItem(item);
-          handleDeleteItem(item.id);
         }
       } else if (e.key === "Delete") {
         const item = filteredItems[selectedIndex];
         if (item) {
           handleDeleteItem(item.id);
+        }
+      } else if (e.key === "p") {
+        const item = filteredItems[selectedIndex];
+        if (item) {
+          handleTogglePin(item.id);
         }
       } else if (e.key === "/") {
         e.preventDefault();
@@ -202,11 +219,24 @@ function App() {
                     {item.content}
                   </div>
                 )}
-                <span
-                  className={`absolute ${item.content_type === "image" ? "bottom-1" : "-bottom-1"} -right-1 bg-black/60 text-white text-[10px] px-1 py-0.5 rounded flex align-center leading-none`}
+
+                <div
+                  className={`cursor-auto absolute ${item.content_type === "image" ? "bottom-1" : "-bottom-1"} -right-1 flex items-center gap-1`}
                 >
-                  {formatSize(item.content_size)}
-                </span>
+                  <span className="bg-black/60 text-white text-[10px] px-1 py-0.5 rounded flex align-center leading-none">
+                    {formatSize(item.content_size)}{" "}
+                  </span>
+                  <button
+                    className={`group cursor-pointer`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleTogglePin(item.id);
+                    }}
+                    title={item.pinned ? "Unpin item" : "Pin item"}
+                  >
+                    <PinIcon pinned={item.pinned} />
+                  </button>
+                </div>
               </div>
             </li>
           ))}
@@ -235,6 +265,12 @@ function App() {
               Canc
             </span>{" "}
             delete
+          </span>
+          <span className="whitespace-nowrap">
+            <span className="bg-gnome-border/70 px-1.5 py-0.5 rounded ml-1">
+              p
+            </span>{" "}
+            pin
           </span>
         </div>
       </div>

@@ -10,6 +10,7 @@ declare global {
         content_type: 'text' | 'image';
         original_format?: string;
         content_size: number;
+        pinned: boolean;
     }
 
     interface Window {
@@ -19,6 +20,7 @@ declare global {
             getHistory: () => Promise<ClipboardItem[]>
             copyToClipboard: (itemId: number) => Promise<void>
             deleteHistoryItem: (id: number) => Promise<void>
+            togglePin: (id: number) => Promise<void>
             hideWindow: () => Promise<void>
             minimizeWindow: () => Promise<void>
             closeWindow: () => Promise<void>
