@@ -1,6 +1,6 @@
 {
   "name": "miniclip",
-  "version": "1.4.0-alpha.0",
+  "version": "1.4.0",
   "description": "A simple clipboard manager for Linux",
   "desktopName": "com.miniclip.app",
   "author": "undefinederror <github@object.ninja>",
