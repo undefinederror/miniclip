@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getHistory: () => ipcRenderer.invoke('get-history'),
   copyToClipboard: (text: string) => ipcRenderer.invoke('copy-to-clipboard', text),
   deleteHistoryItem: (id: number) => ipcRenderer.invoke('delete-history-item', id),
+  clearHistory: (scope: 'unpinned' | 'all') => ipcRenderer.invoke('clear-history', scope),
   togglePin: (id: number) => ipcRenderer.invoke('toggle-pin', id),
   hideWindow: () => ipcRenderer.invoke('hide-window'),
   minimizeWindow: () => ipcRenderer.invoke('minimize-window'),

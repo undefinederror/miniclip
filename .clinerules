@@ -1,0 +1,172 @@
+# Project Rules — Miniclip
+
+## Overview
+
+Miniclip is a minimal clipboard manager for Linux (Wayland/X11), built with Electron and React. It monitors the system clipboard, persists history (text + images) to a local SQLite database, and provides a compact popup window for searching and restoring previous clipboard entries. It runs as a system-tray application and is distributed as a Snap, .deb, and AppImage.
+
+- **License**: GPL-3.0-only
+- **App ID**: `com.miniclip.app`
+- **Desktop name / executable**: `miniclip`
+
+## Tech Stack
+
+| Layer | Technology | Version |
+|---|---|---|
+| Runtime | Electron | 44.x |
+| UI Framework | React | 18.x |
+| Language | TypeScript (strict) | 5.x |
+| Build tool | Vite | 5.x |
+| Styling | Tailwind CSS v4 (via `@tailwindcss/postcss`) | 4.x |
+| Database | better-sqlite3 (native, synchronous) | 13.x |
+| Logging | electron-log | 5.x |
+| Packaging | electron-builder | 26.x |
+| Linting | ESLint + @typescript-eslint | 8.x / 7.x |
+
+## Project Structure
+
+```
+miniclip/
+├── electron/                  # Electron main process
+│   ├── main.ts                # App lifecycle, IPC handlers, clipboard polling, tray, DB
+│   ├── preload.ts             # contextBridge API exposed to renderer
+│   └── electron-env.d.ts      # Node/Electron env type augmentations
+├── src/                       # Renderer process (React)
+│   ├── main.tsx               # Entry point — hash-based routing (#preferences, #about)
+│   ├── App.tsx                # Main clipboard history UI
+│   ├── Preferences.tsx        # Settings window
+│   ├── About.tsx              # About window
+│   ├── PinIcon.tsx            # SVG pin icon component
+│   ├── index.css              # Tailwind imports, GNOME theme CSS variables, custom utilities
+│   ├── vite-env.d.ts          # Global type declarations (ClipboardItem, Window.electronAPI)
+│   └── shared/
+│       └── settings.ts        # Settings interface + defaults (shared between main & renderer)
+├── scripts/
+│   ├── build.mjs              # Programmatic electron-builder entry (snap workaround + publish)
+│   ├── fix-appimage.mjs       # Pre-pack hook: patches AppImage desktop file version
+│   └── update-metainfo.mjs    # Pre-build hook: syncs AppStream metainfo with package.json
+├── build/
+│   ├── applications/          # .desktop file
+│   └── metainfo/              # AppStream appdata XML
+├── public/                    # Static assets (icons, tray images)
+├── .github/workflows/
+│   └── release.yml            # CI: build + publish on tag push
+├── electron-builder.json5     # Packaging config (Linux targets: appimage, deb, snap)
+├── vite.config.ts             # Vite + electron plugin config
+├── tsconfig.json              # TypeScript config (strict, ES2020, react-jsx)
+└── .eslintrc.cjs              # ESLint config
+```
+
+## Architecture & Key Patterns
+
+### Process Model
+
+- **Main process** (`electron/main.ts`): All system interaction — clipboard polling (500ms interval), SQLite DB, tray, window management, settings (JSON file), IPC handlers.
+- **Preload** (`electron/preload.ts`): Exposes typed `window.electronAPI` via `contextBridge`. All renderer↔main communication goes through this.
+- **Renderer** (`src/`): Pure React UI. No direct Node/Electron imports. Communicates exclusively through `window.electronAPI`.
+
+### IPC Pattern
+
+- **Events (main → renderer)**: `clipboard-change`, `settings-changed`, `window-hidden` — subscribed via `ipcRenderer.on`, return cleanup functions.
+- **Invoke (renderer → main)**: `get-history`, `copy-to-clipboard`, `delete-history-item`, `clear-history`, `toggle-pin`, `hide-window`, `minimize-window`, `close-window`, `get-settings`, `set-settings`, `get-version`, `open-external`.
+
+### Database
+
+- SQLite via `better-sqlite3` (synchronous API).
+- DB file: `clipboard_history.db` in `app.getPath('userData')`.
+- Table `clipboard_history`: `id`, `content`, `content_type` ('text'|'image'), `original_format`, `created_at`, `hash`, `pinned`, `sort_time`.
+- Images stored on disk in `userData/images/`, referenced via custom protocol `miniclip-img://`.
+- History trimmed by `maxHistorySize`; pinned items excluded from trimming.
+
+### Settings
+
+- Stored as JSON in user data directory.
+- `Settings` interface in `src/shared/settings.ts` — imported by both main and renderer.
+- Changes broadcast via `settings-changed` IPC event.
+
+### Routing (Renderer)
+
+- No router library. Hash-based: `#preferences` → Preferences, `#about` → About, default → App.
+- Each "page" is a separate BrowserWindow with the appropriate hash.
+
+### Theming
+
+- GNOME-inspired design with CSS custom properties for light/dark themes.
+- Theme switches via `prefers-color-scheme` media query.
+- Custom Tailwind colors: `gnome-bg`, `gnome-surface`, `gnome-accent`, `gnome-text`, `gnome-text-dim`, `gnome-border`, `gnome-input`.
+- Custom utilities: `draggable` / `no-drag` (for Electron window drag regions).
+
+### Single Instance
+
+- Uses `app.requestSingleInstanceLock()`. Second instance with `show` arg focuses existing window.
+
+### Wayland Compatibility
+
+- Global shortcuts NOT registered in-app — users set them via system settings (`miniclip show` CLI).
+- On Wayland sessions the app forces the X11 (XWayland) backend via `--ozone-platform=x11` (self-relaunch at the top of `electron/main.ts`; dev flag in `vite.config.ts`). Wayland's core clipboard protocol only serves the focused client, so an unfocused clipboard manager can't read the clipboard reliably without it.
+
+## Commands
+
+| Command | Description |
+|---|---|
+| `npm run dev` | Start Vite dev server with Electron |
+| `npm run build` | Full production build (tsc → vite build → scripts/build.mjs) |
+| `npm run build:publish` | Build + publish to GitHub/Snap Store |
+| `npm run lint` | ESLint check (ts, tsx — zero warnings allowed) |
+| `npm run preview` | Preview production build |
+
+## Coding Conventions
+
+### TypeScript
+
+- **Strict mode**: `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`.
+- Target ES2020, module ESNext, bundler module resolution.
+- JSX: `react-jsx` (automatic runtime).
+- Prefer interfaces for data shapes, types for unions/function signatures.
+
+### React
+
+- Functional components only, hooks-based.
+- `useState`, `useEffect`, `useRef`, `useCallback` — standard hooks.
+- No class components, no Redux/external state management.
+- Components are in flat `src/` directory (no deep nesting).
+- Event handlers named `handle*` (e.g., `handleSelectItem`, `handleDeleteItem`).
+
+### Styling
+
+- Tailwind CSS utility classes exclusively — no CSS modules or styled-components.
+- Use GNOME theme color tokens (`text-gnome-text`, `bg-gnome-surface`, etc.) — not raw colors.
+- Dark mode handled automatically via CSS variables + `prefers-color-scheme`.
+
+### Electron Main Process
+
+- Use `electron-log` for all logging (not `console.log`).
+- All IPC handlers registered in `main.ts` using `ipcMain.handle()`.
+- Database operations are synchronous (better-sqlite3 API).
+- Wrap DB operations in try/catch, log errors with `log.error()`.
+- Global error handlers for `uncaughtException` and `unhandledRejection`.
+
+### File Organization
+
+- Shared types/interfaces between main and renderer go in `src/shared/`.
+- Type declarations for the renderer go in `src/vite-env.d.ts`.
+- Build scripts go in `scripts/` as ESM (`.mjs`).
+
+## Packaging & Release
+
+- **Targets**: AppImage, .deb, Snap (Linux only — no macOS/Windows).
+- **CI**: GitHub Actions, triggered on tag push (`*`).
+- **Publishing policy** (in `scripts/build.mjs`):
+  - Prerelease versions (containing `-`) → Snap Store `edge` + GitHub pre-release.
+  - Release versions → Snap Store `stable` + GitHub release.
+  - Override with `SNAP_CHANNEL=<channel>` env var.
+- **Snap**: core24 base, strict confinement, LXD builds.
+- **Version bumping**: update `package.json` version; `prebuild` hook auto-updates metainfo XML.
+
+## Important Caveats
+
+- **No tests exist** — there is no test framework configured.
+- **Linux-only** — no macOS or Windows support.
+- **No router** — multi-window hash routing is manual.
+- **better-sqlite3 is native** — marked as `external` in Vite config and must be rebuilt for the target Electron version (handled in CI).
+- **Snap has special constraints** — desktop file naming, StartupWMClass, environment variables. Read the comments in `electron/main.ts` and `electron-builder.json5` before changing snap-related config.
+- **Images use a custom protocol** (`miniclip-img://`) — not base64 data URLs. Protocol handler registered in main process.

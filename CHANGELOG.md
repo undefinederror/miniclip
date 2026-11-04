@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0] - 2026-10-26
+
+### Added 
+- **History size recap**: Shows totals, Clear unpinned, clear all buttons. 
+
+### Enhancements
+- **Image dedup**: Make comparison at pixel level, ignoring screenshot tools metadata. 
+
+### Fixed
+- **Clipboard**: Force the X11 (XWayland) backend on Wayland to fix clipboard
+  reads being stuck on a single type (text or image) while unfocused
+
 ## [1.4.0] - 2026-10-26
 
 ### Added 

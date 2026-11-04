@@ -109,6 +109,22 @@ function App() {
     }
   };
 
+  const handleClearHistory = async (scope: "unpinned" | "all") => {
+    if (
+      !window.confirm(
+        `Clear ${scope === "unpinned" ? "unpinned" : "all"} history?`,
+      )
+    )
+      return;
+    try {
+      await window.electronAPI.clearHistory(scope);
+      setSelectedIndex(-1);
+      await refreshItems();
+    } catch (err) {
+      console.error("Failed to clear history:", err);
+    }
+  };
+
   // Handle Keyboard Navigation
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
@@ -176,8 +192,30 @@ function App() {
 
   return (
     <div className="h-screen w-full bg-gnome-bg text-gnome-text flex flex-col overflow-hidden font-sans">
-      <div className="p-3 flex flex-col flex-1 overflow-hidden">
-        <div className="mb-4 p-1">
+      <div className="p-3 flex flex-col flex-1 overflow-hidden gap-4">
+        <div className="flex items-center justify-between gap-2 text-xs text-gnome-text-dim">
+          <span>
+            {items.length} items:{" "}
+            {formatSize(
+              items.reduce((sum, item) => sum + item.content_size, 0),
+            )}
+          </span>
+          <span className="flex gap-1">
+            <button
+              className="px-2 py-1 cursor-pointer rounded border border-gnome-border/50 bg-gnome-surface/70 text-gnome-text-dim hover:bg-gnome-surface hover:text-gnome-accent"
+              onClick={() => handleClearHistory("unpinned")}
+            >
+              Clear unpinned
+            </button>
+            <button
+              className="px-2 py-1 cursor-pointer rounded border border-gnome-border/50 bg-gnome-surface/70 text-gnome-text-dim hover:bg-gnome-surface hover:text-gnome-accent"
+              onClick={() => handleClearHistory("all")}
+            >
+              Clear all
+            </button>
+          </span>
+        </div>
+
           <input
             ref={inputRef}
             type="text"
@@ -191,13 +229,12 @@ function App() {
             }}
             autoFocus
           />
-        </div>
 
-        <ul ref={listRef} className="flex-1 overflow-y-auto space-y-1.5">
+        <ul ref={listRef} className="flex-1 overflow-y-auto space-y-1.5 pr-2">
           {filteredItems.map((item, index) => (
             <li
               key={item.id}
-              className={`p-2 mr-2 rounded-lg cursor-pointer transition-all break-words border ${
+              className={`p-2 rounded-lg cursor-pointer transition-all break-words border ${
                 index === selectedIndex
                   ? "outline-2 -outline-offset-2 outline-orange-500 border-transparent shadow-md bg-gnome-surface"
                   : "bg-gnome-surface hover:bg-gnome-surface/80 text-gnome-text-dim border-gnome-border/50"
@@ -247,27 +284,27 @@ function App() {
           )}
         </ul>
 
-        <div className="mt-4 text-[10px] text-gnome-text-dim flex justify-center flex-wrap gap-2 uppercase tracking-wider font-semibold opacity-70">
+        <div className="text-[10px] text-gnome-text-dim flex justify-center flex-wrap gap-2 uppercase tracking-wider font-semibold opacity-70">
           <span className="whitespace-nowrap">
-            <span className="bg-gnome-border/70 px-1.5 py-0.5 rounded mx-1">
-              ↓↑
+            <span className="bg-gnome-border/70 px-1 py-0.5 rounded mx-1">
+              ⇑⇓
             </span>{" "}
-            move
+            navigate
           </span>
           <span className="whitespace-nowrap">
-            <span className="bg-gnome-border/70 px-1.5 py-0.5 rounded mx-1">
+            <span className="bg-gnome-border/70 px-1 py-0.5 rounded mx-1">
               Enter
             </span>{" "}
             select
           </span>
           <span className="whitespace-nowrap">
-            <span className="bg-gnome-border/70 px-1.5 py-0.5 rounded ml-1">
+            <span className="bg-gnome-border/70 px-1 py-0.5 rounded ml-1">
               Canc
             </span>{" "}
             delete
           </span>
           <span className="whitespace-nowrap">
-            <span className="bg-gnome-border/70 px-1.5 py-0.5 rounded ml-1">
+            <span className="bg-gnome-border/70 px-1 py-0.5 rounded ml-1">
               p
             </span>{" "}
             pin

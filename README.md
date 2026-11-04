@@ -24,6 +24,8 @@ Miniclip monitors your clipboard and stores a history of entries.
 - **Enter**: Copy an item back to the clipboard.
 - **Filter**: Find a specific item.
 - **Delete**: Remove an item.
+- **Key "p"**: Toggles pin.
+- **Key "/"**: Focus on input.
 
 When Miniclip is hidden in the system tray it can be shown by clicking the tray icon or runing:
 ```bash

@@ -3,11 +3,29 @@ import { app, BrowserWindow, ipcMain, clipboard, Tray, Menu, nativeImage, shell,
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
+import { spawn } from 'node:child_process'
 import Database from 'better-sqlite3'
 import crypto from 'crypto'
 import { type Settings, defaultSettings } from '../src/shared/settings'
 import log from 'electron-log/main'
 import { screen } from 'electron'
+
+// Force the X11 backend under Wayland: X11 selections can be read without a
+// focused window, so the clipboard poll works while the app is hidden.
+// Chromium picks the display backend before this script runs, so relaunch with
+// the flag on the real command line (appendSwitch is too late).
+if (
+  process.platform === 'linux' &&
+  process.env.XDG_SESSION_TYPE === 'wayland' &&
+  !process.argv.includes('--ozone-platform=x11')
+) {
+  const child = spawn(process.execPath, [...process.argv.slice(1), '--ozone-platform=x11'], {
+    detached: true,
+    stdio: 'inherit',
+  })
+  child.unref()
+  process.exit(0)
+}
 
 // --- Logging setup ---
 log.initialize()
@@ -39,6 +57,7 @@ const APP_CLASS = 'miniclip'
 
 app.setName(APP_CLASS)
 app.setAppUserModelId(APP_ID)
+app.disableHardwareAcceleration()
 
 // Snap: do NOT rename the app id / desktop name to match the name snapd installs the desktop
 // file under (miniclip_com.miniclip.app.desktop). GNOME splits an app id containing "_" at the
@@ -499,34 +518,6 @@ function createMainWindow(show: boolean = false) {
   }
 }
 
-function unlockClipboardAccess() {
-  // On Wayland, clipboard reads are blocked for clients with no visible (mapped)
-  // window. Briefly showing a window grants clipboard access for the whole
-  // session (persists even after the window is hidden/destroyed).
-  const unlockWin = new BrowserWindow({
-    width: 0,
-    height: 0,
-    show: false,
-    skipTaskbar: true,
-    resizable: false,
-    movable: false,
-    frame: false,
-    webPreferences: {},
-  })
-  unlockWin.loadURL('about:blank')
-  unlockWin.once('ready-to-show', () => {
-    unlockWin.show()
-    unlockWin.focus()
-    log.info('Unlock window shown and focused')
-    setTimeout(() => {
-      if (!unlockWin.isDestroyed()) {
-        unlockWin.destroy()
-        log.info('Unlock window destroyed')
-      }
-    }, 500)
-  })
-}
-
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
@@ -550,6 +541,7 @@ app.on('before-quit', () => {
 })
 
 app.whenReady().then(() => {
+  if (!gotTheLock) return
   log.info(`=== Miniclip starting up === v${app.getVersion()}`)
   log.info(`Log file: ${log.transports.file.getFile().path}`)
   const mem = process.memoryUsage()
@@ -583,7 +575,6 @@ app.whenReady().then(() => {
   createMainWindow(getSettings().firstLaunch)
   saveSettings({ ...getSettings(), firstLaunch: false })
   win?.focus()
-  unlockClipboardAccess()
   // Start hidden on login/launch
 
   // --- IPC Handlers ---
@@ -721,6 +712,25 @@ app.whenReady().then(() => {
     getDb().prepare('DELETE FROM clipboard_history WHERE id = ?').run(id)
   })
 
+  ipcMain.handle('clear-history', (_event, scope: 'unpinned' | 'all') => {
+    try {
+      const db = getDb()
+      const where = scope === 'unpinned' ? 'WHERE pinned = 0' : ''
+      const rows = db.prepare<[], ClipboardHistoryRow>(`SELECT content, content_type FROM clipboard_history ${where}`).all()
+      const imagesDir = path.join(app.getPath('userData'), 'images')
+      for (const row of rows) {
+        if (row.content_type === 'image' && row.content.startsWith('miniclip-img://')) {
+          const filename = new URL(row.content).hostname
+          const filepath = path.join(imagesDir, filename)
+          if (fs.existsSync(filepath)) fs.unlinkSync(filepath)
+        }
+      }
+      db.prepare(`DELETE FROM clipboard_history ${where}`).run()
+    } catch (e) {
+      log.error('Failed to clear history', e)
+    }
+  })
+
   ipcMain.handle('toggle-pin', (_event, id: number) => {
     try {
       const db = getDb()
@@ -756,6 +766,7 @@ app.whenReady().then(() => {
   // --- Clipboard Monitoring ---
   let lastText = ''
   let lastImageHash = ''
+  let lastRawHash = ''
 
   try {
     const lastItem = getDb().prepare<[], ClipboardHistoryRow>('SELECT content, content_type, hash FROM clipboard_history ORDER BY id DESC LIMIT 1').get()
@@ -790,36 +801,45 @@ app.whenReady().then(() => {
       const text = await clipboard.readText()
 
       if (imageData && imageData.length > 0) {
-        // Create a hash to detect changes
-        const imageHash = crypto.createHash('md5').update(imageData).digest('hex')
+        // rawHash is a cheap comparison that includes screenshot tools metadata
+        // and only spots when nothing changed in the clipboard.
+        const rawHash = crypto.createHash('md5').update(imageData).digest('hex')
+        if (rawHash === lastRawHash) return
+        lastRawHash = rawHash
+
+        const settings = getSettings()
+
+        // Check image size limit
+        const imageSizeKB = imageData.length / 1024
+        if (settings.maxImageSize > 0 && imageSizeKB > settings.maxImageSize) {
+          log.info(`Image too large (${imageSizeKB.toFixed(2)}KB > ${settings.maxImageSize}KB), skipping`)
+          return
+        }
+
+        // Save image to disk and store the custom protocol URL in DB. Convert
+        // to JPEG to reduce storage size (fullscreen screenshots compress from
+        // ~1MB PNG to ~0.3MB). Fall back to raw bytes if nativeImage can't
+        // decode the format.
+        const nativeImg = nativeImage.createFromBuffer(imageData)
+        const jpeg = nativeImg.isEmpty() ? Buffer.alloc(0) : nativeImg.toJPEG(90)
+        const isJpeg = jpeg.length > 0
+        const stored = isJpeg ? jpeg : imageData
+
+        // imageHash is an expensive comparison between image pixels that spots
+        // even different screenshots of the same image.
+        const imageHash = crypto.createHash('md5').update(stored).digest('hex')
 
         if (imageHash !== lastImageHash) {
           lastImageHash = imageHash
-          lastText = '' // Reset text since we have an image
-          const settings = getSettings()
+          lastText = ''
 
           try {
-            // Check image size limit
-            const imageSizeKB = imageData.length / 1024
-            if (settings.maxImageSize > 0 && imageSizeKB > settings.maxImageSize) {
-              log.info(`Image too large (${imageSizeKB.toFixed(2)}KB > ${settings.maxImageSize}KB), skipping`)
-              return
-            }
-
-            // Save image to disk and store the custom protocol URL in DB.
-            // Convert to JPEG to reduce storage size (fullscreen screenshots
-            // compress from ~1MB PNG to ~0.3MB). Fall back to raw bytes if
-            // nativeImage can't decode the format.
             const IMAGES_DIR = path.join(app.getPath('userData'), 'images')
             if (!fs.existsSync(IMAGES_DIR)) fs.mkdirSync(IMAGES_DIR, { recursive: true })
 
-            const nativeImg = nativeImage.createFromBuffer(imageData)
-            const jpeg = nativeImg.isEmpty() ? Buffer.alloc(0) : nativeImg.toJPEG(90)
-            const isJpeg = jpeg.length > 0
-
             const filename = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${isJpeg ? 'jpg' : 'png'}`
             const filepath = path.join(IMAGES_DIR, filename)
-            fs.writeFileSync(filepath, isJpeg ? jpeg : imageData)
+            fs.writeFileSync(filepath, stored)
 
             const imgUrl = `miniclip-img://${filename}`
             const format = isJpeg ? 'image/jpeg' : 'image/png'
@@ -832,8 +852,8 @@ app.whenReady().then(() => {
 
             // Notify Renderer with the protocol URL instead of base64
             win?.webContents.send('clipboard-change', imgUrl)
-            const storedKB = (isJpeg ? jpeg.length : imageData.length) / 1024
-            log.info(`Image saved to clipboard history (${imageSizeKB.toFixed(1)}KB -> ${storedKB.toFixed(1)}KB) -> ${filename}`)
+            const storedKB = stored.length / 1024
+            log.info(`Image saved to clipboard history (${storedKB.toFixed(1)}KB) -> ${filename}`)
           } catch (e) {
             log.error('DB Image Insert Error:', e)
           }

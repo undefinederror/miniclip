@@ -20,6 +20,7 @@ declare global {
             getHistory: () => Promise<ClipboardItem[]>
             copyToClipboard: (itemId: number) => Promise<void>
             deleteHistoryItem: (id: number) => Promise<void>
+            clearHistory: (scope: 'unpinned' | 'all') => Promise<void>
             togglePin: (id: number) => Promise<void>
             hideWindow: () => Promise<void>
             minimizeWindow: () => Promise<void>
